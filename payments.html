@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>תשלומים</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg: #0B0B0B;
+    --surface-1: #161616;
+    --surface-2: #222222;
+    --surface-3: #2E2E2E;
+    --ink: #FAFAFA;
+    --ink-dim: #8A8A8A;
+    --divider: rgba(255,255,255,0.06);
+    --accent: #F2FF44;
+    --accent-fg: #0B0B0B;
+    --chip-bg: #222222;
+    --chip-fg: #FAFAFA;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Heebo', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+  #root { min-height: 100vh; }
+
+  /* English numerals look better here than Hebrew shaping for prices */
+  input, button, select, textarea { font-family: inherit; }
+
+  button:active { transform: scale(0.97); }
+  .list-card:active, .hero-card:active { transform: scale(0.98); }
+  .service-tile:active { transform: scale(0.96); }
+  .row:hover { background: var(--divider); }
+  .iconbtn:hover { background: var(--surface-3); }
+
+  /* Hide scrollbars on horizontal chip rails */
+  .hide-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+  .hide-scroll::-webkit-scrollbar { display: none; }
+
+  /* Stack card expand area — grid-row accordion pattern (works reliably across React render orderings).
+     Uses grid-template-rows: 0fr → 1fr instead of max-height to avoid the stuck-transition issue. */
+  .stack-expand-area {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows .42s cubic-bezier(.2,.7,.3,1);
+  }
+  .stack-expand-area[data-open="true"] { grid-template-rows: 1fr; }
+  .stack-expand-area > .stack-expand-wrap { overflow: hidden; min-height: 0; }
+  .stack-expand-inner { transition: opacity .25s ease .1s, transform .25s ease .1s; }
+  .glass {
+    background: color-mix(in srgb, var(--surface-1) 62%, transparent);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+  }
+  .glass-accent {
+    background: color-mix(in srgb, var(--accent) 62%, transparent);
+    backdrop-filter: blur(22px) saturate(200%);
+    -webkit-backdrop-filter: blur(22px) saturate(200%);
+    border: 1px solid color-mix(in srgb, var(--accent-fg) 6%, transparent);
+  }
+
+  /* Decorative blurred orbs for glass effect to read through */
+  .bg-orbs { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .bg-orbs span {
+    position: absolute; border-radius: 50%; filter: blur(60px); opacity: .45;
+  }
+  .bg-orbs span:nth-child(1) { width: 320px; height: 320px; top: -40px; left: -100px; background: var(--orb-1, #FF6BB5); }
+  .bg-orbs span:nth-child(2) { width: 260px; height: 260px; bottom: 18%; right: -80px; background: var(--orb-2, #7C5CFF); }
+  .bg-orbs span:nth-child(3) { width: 240px; height: 240px; top: 40%; left: 10%; background: var(--orb-3, #50E3C2); }
+
+  /* Date input — native styling normalization */
+  input[type="date"], input[type="time"] {
+    color-scheme: dark;
+    appearance: none; -webkit-appearance: none;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(.85);
+    cursor: pointer;
+  }
+  /* RTL number alignment fix */
+  input[type="number"], input[type="date"], input[type="time"] {
+    direction: ltr;
+    text-align: end;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // Persisted Tweaks defaults — host rewrites this block on edits
+  window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "homeLayout": "tabs",
+    "theme": "light",
+    "accent": "#5CB7FF"
+  }/*EDITMODE-END*/;
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="payment-card.jsx"></script>
+<script type="text/babel" src="stacked-list.jsx"></script>
+<script type="text/babel" src="sheets.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
