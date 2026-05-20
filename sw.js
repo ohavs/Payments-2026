@@ -1,5 +1,32 @@
-// Service worker — offline shell + cache-first for app files, network-only for Firebase.
-const VERSION = 'v4';
+// Service Worker — offline shell + FCM background push.
+// One SW handles both because two SWs at root scope would conflict.
+
+importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: 'AIzaSyDvFsWsB6gH988212-SbF8VdgIV-dfrAvA',
+  authDomain: 'schedual-fdde7.firebaseapp.com',
+  projectId: 'schedual-fdde7',
+  storageBucket: 'schedual-fdde7.firebasestorage.app',
+  messagingSenderId: '267719533646',
+  appId: '1:267719533646:web:c5fe14d9fa9d3930734f1f',
+});
+
+const messaging = firebase.messaging();
+messaging.onBackgroundMessage((payload) => {
+  const n = payload.notification || {};
+  self.registration.showNotification(n.title || 'תזכורת תשלום', {
+    body: n.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    lang: 'he', dir: 'rtl',
+    data: payload.data || {},
+    tag: payload.data?.tag,
+  });
+});
+
+const VERSION = 'v6';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -36,7 +63,6 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Focus / open the app when a notification is clicked
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
@@ -51,17 +77,17 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Never cache: Firebase APIs (Firestore listen, Auth, etc.) and Firebase-injected scripts
+  // Never cache: Firebase APIs, Firestore, FCM
   if (
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('firebaseio.com') ||
     url.hostname.includes('firebase.com') ||
+    url.hostname.includes('gstatic.com') ||
     url.pathname.startsWith('/__/')
   ) {
-    return; // let it pass through to network
+    return;
   }
 
-  // Cross-origin CDN scripts (React, Babel) — cache-first
   if (url.origin !== self.location.origin) {
     event.respondWith(
       caches.match(req).then((hit) =>
@@ -77,7 +103,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin (app shell) — network-first, fall back to cache
+  // Same-origin — NETWORK FIRST always, fall back to cache only if offline.
+  // This ensures fresh code after every deploy.
   event.respondWith(
     fetch(req).then((res) => {
       if (res.ok) {

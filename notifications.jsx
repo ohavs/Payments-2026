@@ -1,8 +1,6 @@
-// Notifications — permission, test, and on-load reminder scan.
-// Note: without a backend (Cloud Functions / FCM) we can't schedule push
-// notifications when the app is closed. The "test" button proves it works;
-// the on-load scanner fires reminders for upcoming payments matching the
-// user's notifTimings whenever the app opens.
+// Notifications — permission, test, FCM token registration, reminder scan.
+// Cloud Functions handle scheduled push (via FCM) when the app is closed;
+// the on-load scanner here covers in-session reminders too.
 
 const NOTIF_TIMING_DAYS = { week: 7, three: 3, day: 1, same: 0 };
 
@@ -68,4 +66,34 @@ function scanForReminders(payments, settings) {
   localStorage.setItem('notif-seen', JSON.stringify(seen));
 }
 
-Object.assign(window, { notifPermission, ensureNotifPermission, showLocalNotification, scanForReminders });
+// ----------------- FCM (Web Push) -----------------
+// Register the device for FCM, store the token under users/{uid}/settings/main.fcmToken.
+// The Cloud Function reads this token to send scheduled push notifications.
+async function registerFcmToken(uid) {
+  if (!uid) return null;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null;
+  if (!window.firebase?.messaging || !window.FCM_VAPID_KEY) return null;
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (!reg) return null;
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({
+      vapidKey: window.FCM_VAPID_KEY,
+      serviceWorkerRegistration: reg,
+    });
+    if (!token) return null;
+    await fbDb.collection('users').doc(uid).collection('settings').doc('main')
+      .set({ fcmToken: token, fcmTokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    // Foreground messages: also show as notification (FCM doesn't auto-display when page is open)
+    messaging.onMessage((payload) => {
+      const n = payload.notification || {};
+      showLocalNotification(n.title || 'תזכורת', n.body || '', { tag: 'fg-' + Date.now() });
+    });
+    return token;
+  } catch (e) {
+    console.error('FCM token registration failed', e);
+    return null;
+  }
+}
+
+Object.assign(window, { notifPermission, ensureNotifPermission, showLocalNotification, scanForReminders, registerFcmToken });

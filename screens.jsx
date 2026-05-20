@@ -359,9 +359,12 @@ function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSign
       toast('יש לאשר הרשאת התראות בדפדפן', { type: 'error' });
       setTestBusy(false); return;
     }
+    // Register FCM token so the server can push (idempotent)
+    const token = await registerFcmToken(user?.uid);
     const ok = await showLocalNotification(
       'בדיקת התראות',
-      'מצוין! ההתראות עובדות. תזכורות יישלחו על תשלומים קרובים.',
+      token ? 'מצוין! התראות פעילות גם כשהאפליקציה סגורה.'
+            : 'מצוין! ההתראות עובדות בתוך האפליקציה.',
       { tag: 'test-' + Date.now() }
     );
     toast(ok ? 'נשלחה התראת בדיקה' : 'שליחה נכשלה', { type: ok ? 'success' : 'error' });

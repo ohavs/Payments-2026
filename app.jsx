@@ -50,6 +50,15 @@ function AppInner() {
     window.scanForReminders?.(payments, settings);
   }, [user?.uid, payments.length, settings?.notif, settingsLoading, paymentsLoading]);
 
+  // Re-register FCM token on app load if notification permission is already granted
+  // (handles new device, token expiry, etc.)
+  useEffect(() => {
+    if (!user || settingsLoading) return;
+    if (window.notifPermission?.() === 'granted') {
+      window.registerFcmToken?.(user.uid);
+    }
+  }, [user?.uid, settingsLoading]);
+
   // Handlers — write through to Firestore + toast feedback
   const openPayment = (p) => setDetail(p);
   const savePayment = async (p) => {

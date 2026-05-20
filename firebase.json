@@ -6,6 +6,7 @@
       ".firebase/**",
       "**/.*",
       "**/node_modules/**",
+      "functions/**",
       "README.md",
       "firestore.rules",
       "firestore.indexes.json"
@@ -40,5 +41,12 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs20"
+    }
+  ]
 }

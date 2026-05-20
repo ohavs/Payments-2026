@@ -129,6 +129,7 @@
 <script src="/__/firebase/10.13.2/firebase-app-compat.js"></script>
 <script src="/__/firebase/10.13.2/firebase-auth-compat.js"></script>
 <script src="/__/firebase/10.13.2/firebase-firestore-compat.js"></script>
+<script src="/__/firebase/10.13.2/firebase-messaging-compat.js"></script>
 <script src="/__/firebase/init.js"></script>
 
 <script type="text/babel" src="tweaks-panel.jsx"></script>
@@ -145,10 +146,26 @@
 <script type="text/babel" src="app.jsx"></script>
 
 <script>
-  // Register service worker for PWA installability + offline shell
+  // VAPID public key for FCM Web Push (safe to ship in client)
+  window.FCM_VAPID_KEY = 'BLNBh697CTtcMnsr4XkUTX11HdCehqTLP8M1eZAo9_XlPgp3GBTa2G0z-XWZOIw4_fv-5Gtf7L6nXLePzpe-SN4';
+
+  // Register the SW. Network-first inside the SW handles freshness;
+  // we also poll for SW updates and reload once when a new one takes control.
   if ('serviceWorker' in navigator) {
+    const wasControlled = !!navigator.serviceWorker.controller;
+    let didReload = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // Reload only on a genuine update (page was already controlled).
+      // First install transitions from null → controller without needing reload.
+      if (!wasControlled || didReload) return;
+      didReload = true;
+      window.location.reload();
+    });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW register failed', e));
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        reg.update();
+        setInterval(() => reg.update(), 5 * 60 * 1000);
+      }).catch((e) => console.warn('SW register failed', e));
     });
   }
 </script>
