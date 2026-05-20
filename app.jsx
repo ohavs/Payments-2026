@@ -1,10 +1,22 @@
-// Main app shell — state, theme, navigation, mounts screens & sheets
+// Main app shell — auth gate, state, theme, navigation, mounts screens & sheets.
 const { useState: _useState4, useEffect: _useEffect4, useMemo: _useMemo4 } = React;
 
-function App() {
+function AppInner() {
   const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
+  const { user, loading: authLoading, signInGoogle, signInAnonymous, signOut } = useAuthUser();
+  const toast = useToast();
+  const confirm = useConfirm();
 
-  // Apply theme + accent + radius via CSS vars
+  // App state — payments + settings come from Firestore, scoped to user.uid
+  const [payments, paymentOps, { loading: paymentsLoading }] = usePayments(user?.uid);
+  const [settings, setSettings, { loading: settingsLoading }] = useFirebaseSettings(user?.uid, user?.displayName);
+
+  const [tab, setTab] = useState('home');
+  const [detail, setDetail] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editCustom, setEditCustom] = useState(null);
+
+  // Apply theme + accent via CSS vars
   useEffect(() => {
     const root = document.documentElement;
     const dark = t.theme === 'dark';
@@ -20,28 +32,51 @@ function App() {
     root.style.setProperty('--chip-bg', dark ? '#222222' : '#EFEFEC');
     root.style.setProperty('--chip-fg', dark ? '#FAFAFA' : '#0B0B0B');
     root.style.setProperty('--glass-border', dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)');
+    // Update PWA theme color to match
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#0B0B0B' : '#F4F4F2');
     document.documentElement.dir = 'rtl';
     document.documentElement.lang = 'he';
   }, [t.theme, t.accent]);
 
-  // App state — payments + settings come from Firestore (anonymous auth scopes to this browser)
-  const [payments, paymentOps] = usePayments();
-  const [settings, setSettings] = useFirebaseSettings();
-  const [tab, setTab] = useState('home');
-  const [detail, setDetail] = useState(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [editCustom, setEditCustom] = useState(null); // payment whose customService is being edited
-
-  // Sync settings.theme → tweak.theme (so changing theme from settings page updates root vars)
+  // Sync settings.theme → tweak.theme
   useEffect(() => {
     if (settings.theme && settings.theme !== t.theme) setTweak('theme', settings.theme);
   }, [settings.theme]);
 
-  // Handlers — write through to Firestore
+  // On payments/settings change, scan for upcoming reminders
+  useEffect(() => {
+    if (!user || paymentsLoading || settingsLoading) return;
+    window.scanForReminders?.(payments, settings);
+  }, [user?.uid, payments.length, settings?.notif, settingsLoading, paymentsLoading]);
+
+  // Handlers — write through to Firestore + toast feedback
   const openPayment = (p) => setDetail(p);
-  const savePayment = (p) => paymentOps.update(p);
-  const deletePayment = (id) => { paymentOps.remove(id); setDetail(null); };
-  const addPayment = (p) => paymentOps.add(p);
+  const savePayment = async (p) => {
+    try { await paymentOps.update(p); toast('השינויים נשמרו', { type: 'success' }); }
+    catch (e) { toast('שגיאה בשמירה', { type: 'error' }); }
+  };
+  const deletePayment = async (id) => {
+    try { await paymentOps.remove(id); setDetail(null); toast('התשלום נמחק', { type: 'success' }); }
+    catch (e) { toast('שגיאה במחיקה', { type: 'error' }); }
+  };
+  const addPayment = async (p) => {
+    try { await paymentOps.add(p); toast('התשלום נוסף', { type: 'success' }); }
+    catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
+  };
+  const handleSignOut = async () => {
+    const ok = await confirm({
+      title: 'התנתקות',
+      message: 'הנתונים נשמרים בענן וייטענו מחדש בכניסה הבאה',
+      confirmLabel: 'התנתק',
+    });
+    if (!ok) return;
+    try { await signOut(); toast('התנתקת', { type: 'info' }); }
+    catch (e) { toast('שגיאה בהתנתקות', { type: 'error' }); }
+  };
+
+  if (authLoading) return <FullScreenLoader label="טוען..." />;
+  if (!user) return <LoginScreen onSignInGoogle={signInGoogle} onSignInAnonymous={signInAnonymous} />;
 
   return (
     <div style={{
@@ -53,11 +88,9 @@ function App() {
         background: 'var(--bg)', overflow: 'hidden',
         display: 'flex', flexDirection: 'column',
       }} data-screen-label={`tab: ${tab}`}>
-        {/* Decorative bg orbs — the surface the glass cards read against */}
         <div className="bg-orbs" aria-hidden="true">
           <span></span><span></span><span></span>
         </div>
-        {/* Scrollable screen body (only for tabs that need page scroll) */}
         <div style={{
           flex: 1, minHeight: 0,
           overflowY: tab === 'home' ? 'hidden' : 'auto',
@@ -65,7 +98,9 @@ function App() {
         }}>
         {tab === 'home' && (
           <HomeScreen
+            user={user}
             payments={payments}
+            paymentsLoading={paymentsLoading}
             onOpenPayment={openPayment}
             onOpenAdd={() => setAddOpen(true)}
             settings={settings}
@@ -79,14 +114,19 @@ function App() {
           />
         )}
         {tab === 'settings' && (
-          <SettingsScreen settings={settings} setSettings={setSettings} accent={t.accent} setAccent={v => setTweak('accent', v)} />
+          <SettingsScreen
+            user={user}
+            settings={settings}
+            setSettings={setSettings}
+            accent={t.accent}
+            setAccent={v => setTweak('accent', v)}
+            onSignOut={handleSignOut}
+          />
         )}
-        </div>{/* /scrollable body */}
+        </div>
 
-        {/* Bottom nav */}
         <BottomNav tab={tab} setTab={setTab} onAdd={() => setAddOpen(true)} />
 
-        {/* Sheets */}
         <DetailSheet
           payment={detail}
           open={!!detail}
@@ -108,7 +148,6 @@ function App() {
         />
       </div>
 
-      {/* Tweaks panel */}
       <TweaksPanel title="Tweaks">
         <TweakSection label="Appearance" />
         <TweakRadio label="Theme" value={t.theme}
@@ -119,6 +158,14 @@ function App() {
           onChange={v => setTweak('accent', v)} />
       </TweaksPanel>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <FeedbackProvider>
+      <AppInner />
+    </FeedbackProvider>
   );
 }
 

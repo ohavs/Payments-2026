@@ -1,62 +1,66 @@
-// Firebase wiring — uses the auto-config served by Firebase Hosting at
-// /__/firebase/init.js (no manual apiKey needed when deployed via Hosting).
+// Firebase wiring — Auth (Google + anonymous fallback) + Firestore hooks.
 //
 // Schema:
 //   users/{uid}/settings/main        — single settings document
 //   users/{uid}/payments/{paymentId} — one document per tracked payment
-//
-// Anonymous auth: each browser gets its own uid, persisted in localStorage by Firebase.
-// To upgrade to email/google login later, swap signInAnonymously for a real provider.
-
-(function () {
-  if (!window.firebase) {
-    console.error('Firebase SDK not loaded');
-    return;
-  }
-  // firebase.initializeApp is called automatically by /__/firebase/init.js on Hosting.
-  // For local dev outside Hosting, you'd need to call initializeApp manually with config.
-  if (firebase.apps.length === 0) {
-    console.warn('Firebase not initialized — make sure /__/firebase/init.js loaded (only works under Firebase Hosting).');
-    return;
-  }
-})();
 
 const fbAuth = window.firebase ? firebase.auth() : null;
 const fbDb = window.firebase ? firebase.firestore() : null;
 
-// Promise that resolves to the signed-in user. Triggers anonymous sign-in if needed.
-const fbUserReady = new Promise((resolve) => {
-  if (!fbAuth) { resolve(null); return; }
-  fbAuth.onAuthStateChanged((u) => {
-    if (u) resolve(u);
-    else fbAuth.signInAnonymously().catch((e) => {
-      console.error('Anonymous sign-in failed', e);
-      resolve(null);
-    });
-  });
-});
+// Enable persistence (offline cache + PWA reliability). Failures are non-fatal
+// (multi-tab still works; we just don't get the persistent cache).
+if (fbDb) {
+  fbDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+}
 
-// React hook: subscribe to /users/{uid}/payments. Returns [payments, { add, update, remove }].
-function usePayments() {
-  const [payments, setPayments] = React.useState([]);
-  const [uid, setUid] = React.useState(null);
+// React hook: returns the current auth state.
+//   { user, loading, signInGoogle, signInAnonymous, signOut }
+function useAuthUser() {
+  const [user, setUser] = React.useState(() => fbAuth?.currentUser || null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    let unsub = null;
-    fbUserReady.then((u) => {
-      if (!u) return;
-      setUid(u.uid);
-      unsub = fbDb.collection('users').doc(u.uid).collection('payments')
-        .onSnapshot((snap) => {
-          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setPayments(rows);
-        }, (err) => console.error('payments subscribe error', err));
+    if (!fbAuth) { setLoading(false); return; }
+    const unsub = fbAuth.onAuthStateChanged((u) => {
+      setUser(u);
+      setLoading(false);
     });
-    return () => { if (unsub) unsub(); };
+    return () => unsub();
   }, []);
 
+  const signInGoogle = React.useCallback(async () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    return fbAuth.signInWithPopup(provider);
+  }, []);
+
+  const signInAnonymous = React.useCallback(() => fbAuth.signInAnonymously(), []);
+
+  const signOut = React.useCallback(() => fbAuth.signOut(), []);
+
+  return { user, loading, signInGoogle, signInAnonymous, signOut };
+}
+
+// React hook: subscribe to /users/{uid}/payments.
+//   [payments, { add, update, remove }, { loading }]
+function usePayments(uid) {
+  const [payments, setPayments] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!uid) { setPayments([]); setLoading(false); return; }
+    setLoading(true);
+    const unsub = fbDb.collection('users').doc(uid).collection('payments')
+      .onSnapshot((snap) => {
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setPayments(rows);
+        setLoading(false);
+      }, (err) => { console.error('payments subscribe error', err); setLoading(false); });
+    return () => unsub();
+  }, [uid]);
+
   const ops = React.useMemo(() => {
-    if (!uid) return { add: () => {}, update: () => {}, remove: () => {} };
+    if (!uid) return { add: async () => {}, update: async () => {}, remove: async () => {} };
     const col = fbDb.collection('users').doc(uid).collection('payments');
     return {
       add: (p) => {
@@ -72,10 +76,9 @@ function usePayments() {
     };
   }, [uid]);
 
-  return [payments, ops, uid];
+  return [payments, ops, { loading }];
 }
 
-// React hook: subscribe to /users/{uid}/settings/main. Returns [settings, setSettings].
 const DEFAULT_SETTINGS = {
   userName: '',
   notif: true,
@@ -87,23 +90,26 @@ const DEFAULT_SETTINGS = {
   defaultCurrency: '₪',
 };
 
-function useFirebaseSettings() {
+function useFirebaseSettings(uid, fallbackName) {
   const [settings, setSettingsState] = React.useState(DEFAULT_SETTINGS);
-  const [uid, setUid] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    let unsub = null;
-    fbUserReady.then((u) => {
-      if (!u) return;
-      setUid(u.uid);
-      const ref = fbDb.collection('users').doc(u.uid).collection('settings').doc('main');
-      unsub = ref.onSnapshot((snap) => {
-        if (snap.exists) setSettingsState({ ...DEFAULT_SETTINGS, ...snap.data() });
-        else ref.set(DEFAULT_SETTINGS);
-      }, (err) => console.error('settings subscribe error', err));
-    });
-    return () => { if (unsub) unsub(); };
-  }, []);
+    if (!uid) { setLoading(false); return; }
+    setLoading(true);
+    const ref = fbDb.collection('users').doc(uid).collection('settings').doc('main');
+    const unsub = ref.onSnapshot((snap) => {
+      if (snap.exists) {
+        setSettingsState({ ...DEFAULT_SETTINGS, ...snap.data() });
+      } else {
+        const seed = { ...DEFAULT_SETTINGS, userName: fallbackName || '' };
+        ref.set(seed).catch(e => console.error('settings seed', e));
+        setSettingsState(seed);
+      }
+      setLoading(false);
+    }, (err) => { console.error('settings subscribe error', err); setLoading(false); });
+    return () => unsub();
+  }, [uid, fallbackName]);
 
   const setSettings = React.useCallback((next) => {
     setSettingsState(next);
@@ -113,7 +119,7 @@ function useFirebaseSettings() {
     }
   }, [uid]);
 
-  return [settings, setSettings];
+  return [settings, setSettings, { loading }];
 }
 
-Object.assign(window, { fbAuth, fbDb, fbUserReady, usePayments, useFirebaseSettings });
+Object.assign(window, { fbAuth, fbDb, useAuthUser, usePayments, useFirebaseSettings });

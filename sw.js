@@ -1,5 +1,5 @@
 // Service worker — offline shell + cache-first for app files, network-only for Firebase.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -7,6 +7,9 @@ const APP_SHELL = [
   '/components.jsx',
   '/data.jsx',
   '/firebase-init.jsx',
+  '/feedback.jsx',
+  '/notifications.jsx',
+  '/auth.jsx',
   '/payment-card.jsx',
   '/screens.jsx',
   '/sheets.jsx',
@@ -31,6 +34,17 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+});
+
+// Focus / open the app when a notification is clicked
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const existing = all.find((c) => c.url.includes(self.location.origin));
+    if (existing) { await existing.focus(); return; }
+    await self.clients.openWindow('/payments.html');
+  })());
 });
 
 self.addEventListener('fetch', (event) => {

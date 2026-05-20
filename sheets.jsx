@@ -31,18 +31,62 @@ function EditField({ label, value, onChange, type = 'text', placeholder, suffix 
 // =================================================================
 function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom }) {
   const [draft, setDraft] = useState(payment);
+  const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
   useEffect(() => { if (payment) setDraft(payment); }, [payment?.id, open]);
 
-  if (!draft) return <Sheet open={open} onClose={onClose}><div /></Sheet>;
+  const isDirty = React.useMemo(() => {
+    if (!payment || !draft) return false;
+    const keys = ['price', 'currency', 'cycle', 'nextDate', 'note'];
+    return keys.some(k => (payment[k] ?? '') !== (draft[k] ?? ''));
+  }, [payment, draft]);
+
+  const handleClose = async () => {
+    if (isDirty) {
+      const ok = await confirm({
+        title: 'יש שינויים שלא נשמרו',
+        message: 'אם תסגור עכשיו, השינויים יאבדו',
+        confirmLabel: 'סגור בלי לשמור',
+        cancelLabel: 'המשך עריכה',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
+
+  // Warn before tab close / refresh while sheet is open & dirty
+  useEffect(() => {
+    if (!open || !isDirty) return;
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [open, isDirty]);
+
+  if (!draft) return <Sheet open={open} onClose={handleClose}><div /></Sheet>;
 
   const service = resolveService(draft);
   const isCustom = !!draft.customService;
   const paid = isAutoPaid(draft);
   const update = (patch) => setDraft({ ...draft, ...patch });
-  const save = () => { onSave(draft); onClose(); };
+  const save = async () => {
+    setSaving(true);
+    await onSave(draft);
+    setSaving(false);
+    onClose();
+  };
+  const requestDelete = async () => {
+    const ok = await confirm({
+      title: 'מחיקת תשלום',
+      message: `האם למחוק את "${service?.name || 'התשלום'}"? פעולה זו לא ניתנת לביטול.`,
+      confirmLabel: 'מחק',
+      danger: true,
+    });
+    if (ok) onDelete(draft.id);
+  };
 
   return (
-    <Sheet open={open} onClose={onClose} title="פרטי תשלום" height="92%">
+    <Sheet open={open} onClose={handleClose} title="פרטי תשלום" height="92%">
       <div style={{ padding: '0 22px 8px' }}>
         {/* Header card */}
         <div style={{
@@ -114,7 +158,7 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
 
       {/* Delete */}
       <div style={{ padding: '16px 22px 0' }}>
-        <button onClick={() => { if (confirm('למחוק את התשלום?')) onDelete(draft.id); }} style={{
+        <button onClick={requestDelete} style={{
           width: '100%', padding: '12px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
           background: 'transparent', color: '#FF6B6B',
           fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
@@ -159,11 +203,17 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
         borderTop: '1px solid var(--divider)',
         marginTop: 12,
       }}>
-        <button onClick={save} style={{
-          width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none', cursor: 'pointer',
+        <button onClick={save} disabled={saving || !isDirty} style={{
+          width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none',
+          cursor: saving ? 'wait' : (isDirty ? 'pointer' : 'not-allowed'),
           background: 'var(--accent)', color: 'var(--accent-fg)',
           fontFamily: 'inherit', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
-        }}>שמור שינויים</button>
+          opacity: isDirty ? 1 : .55, transition: 'opacity .15s ease',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}>
+          {saving && <Spinner size={16} color="var(--accent-fg)" />}
+          {saving ? 'שומר...' : isDirty ? 'שמור שינויים' : 'אין שינויים'}
+        </button>
       </div>
     </Sheet>
   );
@@ -186,6 +236,7 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
   const [glyph, setGlyph] = useState(initial?.glyph || '');
   const [image, setImage] = useState(initial?.image || null);
   const fileRef = useRef(null);
+  const toast = useToast();
 
   const fg = useMemo(() => {
     // Pick contrasting fg based on bg luminance
@@ -211,7 +262,7 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
   };
 
   const save = () => {
-    if (!name.trim()) { alert('יש להזין שם לשירות'); return; }
+    if (!name.trim()) { toast('יש להזין שם לשירות', { type: 'error' }); return; }
     onSave({
       id: initial?.id || ('custom_' + Date.now()),
       name: name.trim(),
@@ -350,6 +401,8 @@ function AddSheet({ open, onClose, onAdd }) {
   const [activeCat, setActiveCat] = useState('all');
   const [picked, setPicked] = useState(null);   // service object (catalog entry OR custom)
   const [customDraft, setCustomDraft] = useState(null); // the in-progress custom service
+  const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   // configure-step fields
   const [price, setPrice] = useState(0);
@@ -357,6 +410,20 @@ function AddSheet({ open, onClose, onAdd }) {
   const [currency, setCurrency] = useState('₪');
   const [nextDate, setNextDate] = useState('');
   const [note, setNote] = useState('');
+
+  // Warn if user tries to close with a service picked and step !== 'pick'
+  const handleClose = async () => {
+    if (step === 'configure' || step === 'custom') {
+      const ok = await confirm({
+        title: 'יציאה ללא שמירה',
+        message: 'התשלום לא נוסף עדיין. האם להמשיך?',
+        confirmLabel: 'יציאה',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (!open) {
@@ -383,22 +450,24 @@ function AddSheet({ open, onClose, onAdd }) {
     });
   }, [query, activeCat]);
 
-  const submit = () => {
-    if (!picked) return;
+  const submit = async () => {
+    if (!picked || saving) return;
+    setSaving(true);
     const isCustom = picked.id.startsWith('custom_');
-    onAdd({
+    await onAdd({
       id: 'p' + Date.now(),
       serviceId: isCustom ? null : picked.id,
       customService: isCustom ? picked : null,
       price, currency, cycle, nextDate, note,
     });
+    setSaving(false);
     onClose();
   };
 
   // ---------- STEP: configure ----------
   if (step === 'configure' && picked) {
     return (
-      <Sheet open={open} onClose={onClose} title="הוספת תשלום" height="92%">
+      <Sheet open={open} onClose={handleClose} title="הוספת תשלום" height="92%">
         <div style={{ padding: '0 22px 8px' }}>
           <button onClick={() => { setStep('pick'); setPicked(null); }} style={{
             background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-dim)',
@@ -451,11 +520,17 @@ function AddSheet({ open, onClose, onAdd }) {
           padding: '14px 22px 22px',
           borderTop: '1px solid var(--divider)',
         }}>
-          <button onClick={submit} style={{
-            width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none', cursor: 'pointer',
+          <button onClick={submit} disabled={saving} style={{
+            width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none',
+            cursor: saving ? 'wait' : 'pointer',
             background: 'var(--accent)', color: 'var(--accent-fg)',
             fontFamily: 'inherit', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
-          }}>הוסף תשלום</button>
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            opacity: saving ? .8 : 1,
+          }}>
+            {saving && <Spinner size={16} color="var(--accent-fg)" />}
+            {saving ? 'מוסיף...' : 'הוסף תשלום'}
+          </button>
         </div>
       </Sheet>
     );
@@ -464,7 +539,7 @@ function AddSheet({ open, onClose, onAdd }) {
   // ---------- STEP: custom service builder ----------
   if (step === 'custom') {
     return (
-      <Sheet open={open} onClose={onClose} title="שירות מותאם אישית" height="92%">
+      <Sheet open={open} onClose={handleClose} title="שירות מותאם אישית" height="92%">
         <CustomServiceBuilder
           initial={customDraft || (query ? { name: query } : null)}
           onCancel={() => { setStep('pick'); setCustomDraft(null); }}
@@ -476,7 +551,7 @@ function AddSheet({ open, onClose, onAdd }) {
 
   // ---------- STEP: pick from catalog ----------
   return (
-    <Sheet open={open} onClose={onClose} title="הוסף שירות" height="92%">
+    <Sheet open={open} onClose={handleClose} title="הוסף שירות" height="92%">
       <div style={{ padding: '0 22px 14px' }}>
         {/* Search */}
         <div style={{
