@@ -24,34 +24,24 @@ function App() {
     document.documentElement.lang = 'he';
   }, [t.theme, t.accent]);
 
-  // App state
-  const [payments, setPayments] = useState(() => seedPayments());
+  // App state — payments + settings come from Firestore (anonymous auth scopes to this browser)
+  const [payments, paymentOps] = usePayments();
+  const [settings, setSettings] = useFirebaseSettings();
   const [tab, setTab] = useState('home');
   const [detail, setDetail] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editCustom, setEditCustom] = useState(null); // payment whose customService is being edited
 
-  const [settings, setSettings] = useState({
-    userName: 'נועה כהן',
-    notif: true,
-    notifTimings: ['three', 'day'],
-    notifTime: '09:00',
-    monthlySummary: true,
-    theme: t.theme,
-    language: 'he',
-    defaultCurrency: '₪',
-  });
-
   // Sync settings.theme → tweak.theme (so changing theme from settings page updates root vars)
   useEffect(() => {
-    if (settings.theme !== t.theme) setTweak('theme', settings.theme);
+    if (settings.theme && settings.theme !== t.theme) setTweak('theme', settings.theme);
   }, [settings.theme]);
 
-  // Handlers
+  // Handlers — write through to Firestore
   const openPayment = (p) => setDetail(p);
-  const savePayment = (p) => setPayments(payments.map(x => x.id === p.id ? p : x));
-  const deletePayment = (id) => { setPayments(payments.filter(x => x.id !== id)); setDetail(null); };
-  const addPayment = (p) => setPayments([...payments, p]);
+  const savePayment = (p) => paymentOps.update(p);
+  const deletePayment = (id) => { paymentOps.remove(id); setDetail(null); };
+  const addPayment = (p) => paymentOps.add(p);
 
   return (
     <div style={{

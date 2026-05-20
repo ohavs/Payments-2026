@@ -68,30 +68,11 @@ const CATEGORIES = [
   { id: 'other',     name: 'אחר',             emoji: '◒' },
 ];
 
-// Seed: user's current tracked payments. Each: id, serviceId | customService, price, currency, cycle, nextDate (ISO), note.
+// Payments are loaded live from Firestore at /users/{uid}/payments — see firebase-init.jsx.
+// Each: id, serviceId | customService, price, currency, cycle, nextDate (ISO), note.
 // Paid state is derived automatically: a payment whose nextDate has passed is paid for this cycle.
 function seedPayments() {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const inDays = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); };
-
-  return [
-    // Past this month → auto-paid
-    { id: 'p11', serviceId: 'github',    price: 16,    currency: '₪', cycle: 'monthly', nextDate: inDays(-2),  note: '' },
-    { id: 'p12', serviceId: 'figma',     price: 55,    currency: '₪', cycle: 'monthly', nextDate: inDays(-5),  note: '' },
-    { id: 'p13', serviceId: 'netflix',   price: 54.90, currency: '₪', cycle: 'monthly', nextDate: inDays(-8),  note: '' },
-    { id: 'p14', serviceId: 'spotify',   price: 21.90, currency: '₪', cycle: 'monthly', nextDate: inDays(-12), note: '' },
-
-    // Upcoming
-    { id: 'p1',  serviceId: 'ytpremium', price: 29.90, currency: '₪', cycle: 'monthly', nextDate: inDays(2),   note: '' },
-    { id: 'p2',  serviceId: 'chatgpt',   price: 75,    currency: '₪', cycle: 'monthly', nextDate: inDays(5),   note: '' },
-    { id: 'p3',  serviceId: 'partner',   price: 49,    currency: '₪', cycle: 'monthly', nextDate: inDays(11),  note: 'חבילת משפחה' },
-    { id: 'p4',  serviceId: 'arnona',    price: 540,   currency: '₪', cycle: 'monthly', nextDate: inDays(18),  note: '' },
-    { id: 'p5',  serviceId: 'electric',  price: 480,   currency: '₪', cycle: 'monthly', nextDate: inDays(22),  note: 'דו-חודשי בפועל' },
-    { id: 'p7',  serviceId: 'ins_car',   price: 320,   currency: '₪', cycle: 'monthly', nextDate: inDays(14),  note: '' },
-    { id: 'p8',  serviceId: 'parking',   price: 25,    currency: '₪', cycle: 'weekly',  nextDate: inDays(1),   note: '' },
-    { id: 'p9',  serviceId: 'sport',     price: 90,    currency: '₪', cycle: 'weekly',  nextDate: inDays(3),   note: 'שיעור פילאטיס' },
-    { id: 'p10', serviceId: 'rav',       price: 7.50,  currency: '₪', cycle: 'daily',   nextDate: inDays(0),   note: 'נסיעה יומית' },
-  ];
+  return [];
 }
 
 const CURRENCIES = ['₪', '$', '€', '£'];
