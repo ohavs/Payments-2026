@@ -68,6 +68,79 @@ function StatsCard({ paid, planned, count, onClick }) {
   );
 }
 
+// Total recurring spend — monthly equivalent across all cycles.
+// Click to open the detailed breakdown sheet.
+function TotalsCard({ payments, onClick }) {
+  const monthlyTotal = useMemo(() => totalsByMonthlyEquivalent(payments), [payments]);
+  const counts = useMemo(() => countsPerCycle(payments), [payments]);
+  const totalCount = payments.length;
+
+  return (
+    <button onClick={onClick} className="hero-card" style={{
+      width: '100%', textAlign: 'start', cursor: 'pointer',
+      color: 'var(--ink)', fontFamily: 'inherit',
+      background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
+      backdropFilter: 'blur(24px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      border: '1px solid var(--glass-border)',
+      borderRadius: 28, padding: 22,
+      display: 'flex', flexDirection: 'column', gap: 18,
+      position: 'relative', overflow: 'hidden',
+      boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
+    }}>
+      <svg style={{ position: 'absolute', inset: 0, opacity: 0.08, pointerEvents: 'none' }} viewBox="0 0 400 280" preserveAspectRatio="none">
+        {Array.from({length: 14}).map((_, i) => (
+          <line key={i} x1={i * 30} y1="280" x2={i * 30 - 80} y2="0" stroke="currentColor" strokeWidth="1" />
+        ))}
+      </svg>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 4, letterSpacing: '-0.01em' }}>
+            סך כל ההוצאה החודשית
+          </div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)' }}>
+            מנורמל לפי תדירות
+          </div>
+        </div>
+        <div style={{
+          padding: '6px 12px', borderRadius: 999,
+          background: 'var(--accent)', color: 'var(--accent-fg)',
+          fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+        }}>
+          {totalCount} פעילים
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative' }}>
+        <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          {fmtMoney(monthlyTotal)}
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink-dim)' }}>/ חודש</div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, position: 'relative', flexWrap: 'wrap' }}>
+        {CYCLE_ORDER.map(c => counts[c] > 0 && (
+          <span key={c} style={{
+            padding: '5px 10px', borderRadius: 999,
+            background: 'var(--surface-2)',
+            fontSize: 11.5, fontWeight: 700,
+          }}>
+            {CYCLE_LABEL[c]} · {counts[c]}
+          </span>
+        ))}
+        <span style={{ marginInlineStart: 'auto', alignSelf: 'center',
+          fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)',
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}>
+          לפרטים
+          <Icon name="chevron-left" size={14} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
 // Compact list row card — used in sections + upcoming list
 function ListCard({ payment, onClick, accent }) {
   const service = resolveService(payment);
@@ -140,4 +213,4 @@ function SectionHeader({ title, count, total, action, onAction }) {
   );
 }
 
-Object.assign(window, { StatsCard, ListCard, SectionHeader });
+Object.assign(window, { StatsCard, TotalsCard, ListCard, SectionHeader });

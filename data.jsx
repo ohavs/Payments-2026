@@ -160,9 +160,73 @@ function fmtRelative(iso) {
   return fmtDateShort(iso);
 }
 
+// ----------------- Day-of-month / week helpers -----------------
+// For monthly/weekly cycles we let users pick a recurrence day instead of an
+// absolute date. The actual nextDate is computed as "the next time this day
+// falls on or after today".
+
+function lastDayOfMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+
+function nextDateForDayOfMonth(day) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const y = today.getFullYear(), m = today.getMonth();
+  const clampedThis = Math.min(day, lastDayOfMonth(y, m));
+  const thisMonth = new Date(y, m, clampedThis);
+  if (thisMonth >= today) return thisMonth.toISOString().slice(0, 10);
+  const ny = m === 11 ? y + 1 : y;
+  const nm = (m + 1) % 12;
+  const clampedNext = Math.min(day, lastDayOfMonth(ny, nm));
+  return new Date(ny, nm, clampedNext).toISOString().slice(0, 10);
+}
+
+function nextDateForDayOfWeek(weekday) { // 0 = Sunday
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const delta = (weekday - today.getDay() + 7) % 7; // 0 means today
+  const d = new Date(today); d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function dayOfMonthFromDate(iso) {
+  if (!iso) return new Date().getDate();
+  return new Date(iso).getDate();
+}
+function dayOfWeekFromDate(iso) {
+  if (!iso) return new Date().getDay();
+  return new Date(iso).getDay();
+}
+
+// ----------------- Cross-cycle stats helpers -----------------
+// Normalize each payment to its monthly equivalent so a total feels right
+// regardless of mix (daily × 30, weekly × ~4.33, monthly × 1).
+const CYCLE_PER_MONTH = { monthly: 1, weekly: 30 / 7, daily: 30 };
+
+function monthlyEquivalent(payment) {
+  return Number(payment.price || 0) * (CYCLE_PER_MONTH[payment.cycle] || 1);
+}
+
+function totalsByMonthlyEquivalent(payments) {
+  return payments.reduce((s, p) => s + monthlyEquivalent(p), 0);
+}
+
+function totalsPerCycle(payments) {
+  const t = { monthly: 0, weekly: 0, daily: 0 };
+  payments.forEach(p => { t[p.cycle] = (t[p.cycle] || 0) + Number(p.price || 0); });
+  return t;
+}
+
+function countsPerCycle(payments) {
+  const c = { monthly: 0, weekly: 0, daily: 0 };
+  payments.forEach(p => { c[p.cycle] = (c[p.cycle] || 0) + 1; });
+  return c;
+}
+
 Object.assign(window, {
   SERVICE_CATALOG, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, ACCENT_PALETTE,
   seedPayments, getService, resolveService, isAutoPaid,
   paidThisMonth, plannedThisMonth,
   fmtMoney, daysUntil, fmtDateShort, fmtRelative,
+  nextDateForDayOfMonth, nextDateForDayOfWeek, dayOfMonthFromDate, dayOfWeekFromDate,
+  lastDayOfMonth,
+  monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
+  CYCLE_PER_MONTH,
 });

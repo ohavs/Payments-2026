@@ -1,5 +1,70 @@
 // Detail sheet, Add Service sheet, and Custom Service builder.
 
+// ---------- Day-of-cycle picker ----------
+// Replaces the absolute-date input. The user picks a recurrence day; we
+// compute the next occurrence and store it as nextDate.
+function CyclePicker({ cycle, nextDate, onPickDate }) {
+  if (cycle === 'daily') {
+    return (
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תזמון</div>
+        <div style={{ fontSize: 14, color: 'var(--ink-dim)' }}>
+          תשלום יומי – נגבה כל יום
+        </div>
+      </div>
+    );
+  }
+
+  if (cycle === 'weekly') {
+    const current = nextDate ? dayOfWeekFromDate(nextDate) : new Date().getDay();
+    const labels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+    return (
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>יום בשבוע</div>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
+          {labels.map((lbl, i) => (
+            <button key={i} onClick={() => onPickDate(nextDateForDayOfWeek(i))} style={{
+              flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: current === i ? 'var(--accent)' : 'var(--surface-3)',
+              color: current === i ? 'var(--accent-fg)' : 'var(--ink)',
+              fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
+              transition: 'background .15s ease',
+            }}>{lbl}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8, textAlign: 'start' }}>
+          תיגבה כל יום {labels[current]}' · המועד הבא: {fmtDateShort(nextDate)}
+        </div>
+      </div>
+    );
+  }
+
+  // monthly
+  const currentDay = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
+  return (
+    <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>יום בחודש</div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6,
+      }}>
+        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+          <button key={d} onClick={() => onPickDate(nextDateForDayOfMonth(d))} style={{
+            aspectRatio: '1 / 1', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: currentDay === d ? 'var(--accent)' : 'var(--surface-3)',
+            color: currentDay === d ? 'var(--accent-fg)' : 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+            fontVariantNumeric: 'tabular-nums',
+            transition: 'background .15s ease',
+          }}>{d}</button>
+        ))}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
+        תיגבה ב-{currentDay} בכל חודש · המועד הבא: {fmtDateShort(nextDate)}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Edit field row ----------
 function EditField({ label, value, onChange, type = 'text', placeholder, suffix }) {
   return (
@@ -147,12 +212,21 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תדירות</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {CYCLE_ORDER.map(c => (
-              <Chip key={c} active={draft.cycle === c} onClick={() => update({ cycle: c })}>{CYCLE_LABEL[c]}</Chip>
+              <Chip key={c} active={draft.cycle === c} onClick={() => {
+                // Re-anchor nextDate against the new cycle so the picker shows a sane day
+                const newDate = c === 'monthly'
+                  ? nextDateForDayOfMonth(dayOfMonthFromDate(draft.nextDate))
+                  : c === 'weekly'
+                    ? nextDateForDayOfWeek(dayOfWeekFromDate(draft.nextDate))
+                    : draft.nextDate;
+                update({ cycle: c, nextDate: newDate });
+              }}>{CYCLE_LABEL[c]}</Chip>
             ))}
           </div>
         </div>
 
-        <EditField label="תאריך התשלום הבא" value={draft.nextDate} type="date" onChange={(v) => update({ nextDate: v })} />
+        <CyclePicker cycle={draft.cycle} nextDate={draft.nextDate}
+          onPickDate={(v) => update({ nextDate: v })} />
         <EditField label="הערה" value={draft.note} onChange={(v) => update({ note: v })} placeholder="לדוגמה: חבילת משפחה" />
       </div>
 
@@ -435,10 +509,16 @@ function AddSheet({ open, onClose, onAdd }) {
   useEffect(() => {
     if (picked) {
       setPrice(picked.price || 0);
-      setCycle(picked.cycle || 'monthly');
+      const c = picked.cycle || 'monthly';
+      setCycle(c);
       setCurrency('₪');
-      const d = new Date(); d.setDate(d.getDate() + 14);
-      setNextDate(d.toISOString().slice(0, 10));
+      // Default to a sensible next occurrence based on the cycle
+      const today = new Date();
+      setNextDate(
+        c === 'monthly' ? nextDateForDayOfMonth(today.getDate()) :
+        c === 'weekly'  ? nextDateForDayOfWeek(today.getDay()) :
+        today.toISOString().slice(0, 10)
+      );
     }
   }, [picked?.id]);
 
@@ -506,10 +586,17 @@ function AddSheet({ open, onClose, onAdd }) {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תדירות</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {CYCLE_ORDER.map(c => (<Chip key={c} active={cycle === c} onClick={() => setCycle(c)}>{CYCLE_LABEL[c]}</Chip>))}
+              {CYCLE_ORDER.map(c => (<Chip key={c} active={cycle === c} onClick={() => {
+                const newDate = c === 'monthly'
+                  ? nextDateForDayOfMonth(dayOfMonthFromDate(nextDate || new Date().toISOString()))
+                  : c === 'weekly'
+                    ? nextDateForDayOfWeek(dayOfWeekFromDate(nextDate || new Date().toISOString()))
+                    : new Date().toISOString().slice(0, 10);
+                setCycle(c); setNextDate(newDate);
+              }}>{CYCLE_LABEL[c]}</Chip>))}
             </div>
           </div>
-          <EditField label="תאריך התשלום הבא" value={nextDate} type="date" onChange={setNextDate} />
+          <CyclePicker cycle={cycle} nextDate={nextDate} onPickDate={setNextDate} />
           <EditField label="הערה" value={note} onChange={setNote} placeholder="אופציונלי" />
         </div>
 

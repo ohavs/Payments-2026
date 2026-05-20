@@ -57,9 +57,14 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
   const paid = isAutoPaid(payment);
   const isLast = index === total - 1;
 
-  // Darker overlay for top rows, near-zero for bottom — gives the "rising stack"
-  // effect from the reference (top card slightly recessed/darker, bottom brightest).
-  const darkOverlay = Math.max(0, 13 - index * 2);
+  // Darker overlay graduates more aggressively from top → bottom so upper rows
+  // feel "underneath" and lower ones rise on top.
+  const darkOverlay = Math.max(0, 18 - index * 3);
+  // Soft drop-shadow above each row (except first) + bright top edge highlight
+  // → each row looks like a physical card lifted on top of the previous one.
+  const liftShadow = index > 0
+    ? '0 -6px 14px -2px rgba(0,0,0,.28), inset 0 1.5px 0 rgba(255,255,255,.32)'
+    : 'inset 0 1px 0 rgba(255,255,255,.2)';
 
   return (
     <div
@@ -68,12 +73,18 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
         position: 'relative',
         cursor: 'pointer',
         background: isExpanded
-          ? 'rgba(0,0,0,.14)'
+          ? 'rgba(0,0,0,.16)'
           : `color-mix(in srgb, var(--accent-fg) ${darkOverlay}%, transparent)`,
-        // Hairline top highlight on every row after the first — sells the "lifted layer" feel
-        boxShadow: index > 0 ? 'inset 0 1px 0 rgba(255,255,255,.22)' : 'none',
-        // Soft separator at the bottom (except last)
-        borderBottom: !isLast ? '1px solid color-mix(in srgb, var(--accent-fg) 7%, transparent)' : 'none',
+        boxShadow: liftShadow,
+        // Rounded top corners on every row except the first → combined with the
+        // shadow above, each row reads as a discrete card lifting.
+        borderTopLeftRadius: index > 0 ? 18 : 0,
+        borderTopRightRadius: index > 0 ? 18 : 0,
+        // Negative top margin so the rounded lip overlaps the previous row,
+        // producing the "stacked / rising" silhouette.
+        marginTop: index > 0 ? -10 : 0,
+        // Later rows go higher so the lift shadow renders above the previous row.
+        zIndex: index + 1,
         transition: 'background .25s ease',
         opacity: paid ? 0.6 : 1,
         WebkitTapHighlightColor: 'transparent',

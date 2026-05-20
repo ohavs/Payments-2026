@@ -1,9 +1,220 @@
-// Main screens: Home (with 3 variations), Calendar, Settings
+// Main screens: Home, Calendar, Settings
+
+// ---------- Swipeable stats carousel (One UI-style widget pager) ----------
+function StatsCarousel({ pages }) {
+  const railRef = React.useRef(null);
+  const [page, setPage] = React.useState(0);
+
+  // Snap-scroll observer → derive the active page from scroll position
+  React.useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    let raf = null;
+    const onScroll = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = rail.clientWidth;
+        const idx = Math.round(rail.scrollLeft / w);
+        // RTL: scrollLeft can be negative or inverted. Normalize.
+        const childCount = pages.length;
+        const computed = childCount > 1 ? Math.min(childCount - 1, Math.max(0, Math.abs(idx))) : 0;
+        setPage(computed);
+      });
+    };
+    rail.addEventListener('scroll', onScroll, { passive: true });
+    return () => { rail.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [pages.length]);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div ref={railRef} className="hide-scroll" style={{
+        display: 'flex', overflowX: 'auto', overflowY: 'hidden',
+        scrollSnapType: 'x mandatory',
+        WebkitOverflowScrolling: 'touch',
+        gap: 0,
+      }}>
+        {pages.map((p, i) => (
+          <div key={i} style={{
+            flex: '0 0 100%', scrollSnapAlign: 'center',
+            scrollSnapStop: 'always',
+            paddingInline: 1,
+          }}>{p}</div>
+        ))}
+      </div>
+      {/* Pagination dots */}
+      <div style={{
+        display: 'flex', justifyContent: 'center', gap: 6,
+        marginTop: 10,
+      }}>
+        {pages.map((_, i) => (
+          <span key={i} style={{
+            width: page === i ? 18 : 6, height: 6, borderRadius: 999,
+            background: page === i ? 'var(--accent)' : 'var(--surface-3)',
+            transition: 'width .25s cubic-bezier(.22,.61,.36,1), background .2s ease',
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Stats detail sheet (totals breakdown) ----------
+function StatsDetailSheet({ open, onClose, payments }) {
+  const stats = React.useMemo(() => {
+    const monthly = totalsByMonthlyEquivalent(payments);
+    const perCycle = totalsPerCycle(payments);
+    const counts = countsPerCycle(payments);
+    const yearly = monthly * 12;
+
+    const byMonthlyEq = payments.map(p => ({ p, eq: monthlyEquivalent(p) }))
+      .sort((a, b) => b.eq - a.eq);
+    const top = byMonthlyEq[0];
+    const cheapest = byMonthlyEq[byMonthlyEq.length - 1];
+    const avg = payments.length ? monthly / payments.length : 0;
+
+    // Group by category (via resolveService)
+    const catTotals = {};
+    payments.forEach(p => {
+      const s = resolveService(p);
+      const cat = s?.cat || 'other';
+      catTotals[cat] = (catTotals[cat] || 0) + monthlyEquivalent(p);
+    });
+    const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    return { monthly, yearly, perCycle, counts, top: top?.p, topEq: top?.eq, cheapest: cheapest?.p, cheapestEq: cheapest?.eq, avg, topCats };
+  }, [payments]);
+
+  if (!payments.length) {
+    return (
+      <Sheet open={open} onClose={onClose} title="ניתוח הוצאות" height="80%">
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-dim)', fontSize: 14 }}>
+          אין עדיין תשלומים לניתוח
+        </div>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} title="ניתוח הוצאות" height="88%">
+      <div style={{ padding: '0 22px 32px' }}>
+        {/* Big numbers */}
+        <div style={{
+          background: 'var(--surface-2)', borderRadius: 22, padding: 20, marginBottom: 14,
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14,
+        }}>
+          <BigStat label="חודשי" value={fmtMoney(stats.monthly)} />
+          <BigStat label="שנתי (צפי)" value={fmtMoney(stats.yearly)} />
+          <BigStat label="ממוצע לתשלום" value={fmtMoney(stats.avg)} />
+          <BigStat label="סה״כ פעילים" value={String(payments.length)} />
+        </div>
+
+        {/* Per-cycle breakdown */}
+        <div style={{ background: 'var(--surface-2)', borderRadius: 22, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 14, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+            פירוט לפי תדירות
+          </div>
+          {CYCLE_ORDER.map(c => {
+            const sumRaw = stats.perCycle[c] || 0;
+            const cnt = stats.counts[c] || 0;
+            if (!cnt) return null;
+            const equiv = sumRaw * (CYCLE_PER_MONTH[c] || 1);
+            const pct = stats.monthly > 0 ? Math.round(equiv / stats.monthly * 100) : 0;
+            return (
+              <div key={c} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{CYCLE_LABEL[c]}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--ink-dim)', fontWeight: 600 }}>{cnt} תשלומים · {pct}%</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width .4s ease' }} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtMoney(sumRaw)} {c === 'monthly' ? 'בחודש' : c === 'weekly' ? 'בשבוע' : 'ביום'} · {fmtMoney(equiv)} שווה-ערך חודשי
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Highlights */}
+        <div style={{ background: 'var(--surface-2)', borderRadius: 22, padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 14, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+            דגשים
+          </div>
+          {stats.top && <HighlightRow icon="arrow-up-right" label="ההוצאה הגבוהה ביותר"
+            value={`${resolveService(stats.top)?.name || 'תשלום'} · ${fmtMoney(stats.topEq)}/ח'`} />}
+          {stats.cheapest && stats.cheapest !== stats.top && (
+            <HighlightRow icon="check" label="ההוצאה הקטנה ביותר"
+              value={`${resolveService(stats.cheapest)?.name || 'תשלום'} · ${fmtMoney(stats.cheapestEq)}/ח'`} />
+          )}
+        </div>
+
+        {/* Top categories */}
+        {stats.topCats.length > 0 && (
+          <div style={{ background: 'var(--surface-2)', borderRadius: 22, padding: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 14, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+              לפי קטגוריה
+            </div>
+            {stats.topCats.map(([catId, sum]) => {
+              const cat = CATEGORIES.find(x => x.id === catId);
+              const pct = stats.monthly > 0 ? Math.round(sum / stats.monthly * 100) : 0;
+              return (
+                <div key={catId} style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{cat?.name || catId}</span>
+                    <span style={{ fontSize: 12, color: 'var(--ink-dim)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtMoney(sum)} · {pct}%
+                    </span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function BigStat({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)', letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+function HighlightRow({ icon, label, value }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, background: 'var(--surface-3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <Icon name={icon} size={15} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-dim)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
 
 // ---------- HOME ----------
 // Layout: header + compact stats card pinned at top, stacked card list fills the rest
 // and scrolls INTERNALLY (the page itself does NOT scroll).
 function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
+  const [statsDetailOpen, setStatsDetailOpen] = useState(false);
   // Upcoming = not auto-paid yet, sorted by date
   const upcoming = useMemo(() => {
     return [...payments]
@@ -31,11 +242,13 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
     }}>
       <div style={{ padding: '0 18px', flexShrink: 0 }}>
         <Header onOpenAdd={onOpenAdd} user={user} fallbackName={settings.userName} />
-        <div style={{ marginBottom: 16 }}>
-          <StatsCard paid={stats.paid} planned={stats.planned} count={stats.paidCount} />
-        </div>
+        <StatsCarousel pages={[
+          <StatsCard key="paid" paid={stats.paid} planned={stats.planned} count={stats.paidCount} />,
+          <TotalsCard key="totals" payments={payments} onClick={() => setStatsDetailOpen(true)} />,
+        ]} />
         <SectionHeader title="מועדים קרובים" count={paymentsLoading ? null : upcoming.length} />
       </div>
+      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)} payments={payments} />
 
       {paymentsLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 18px' }}>
