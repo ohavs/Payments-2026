@@ -115,7 +115,7 @@ function paidThisMonth(payments) {
   const today = new Date(); today.setHours(0,0,0,0);
   const m = today.getMonth(), y = today.getFullYear();
   return payments.reduce((sum, p) => {
-    const d = new Date(p.nextDate);
+    const d = parseISODate(p.nextDate);
     if (d.getFullYear() === y && d.getMonth() === m && d <= today) {
       return sum + Number(p.price || 0);
     }
@@ -128,7 +128,7 @@ function plannedThisMonth(payments) {
   const today = new Date();
   const m = today.getMonth(), y = today.getFullYear();
   return payments.reduce((sum, p) => {
-    const d = new Date(p.nextDate);
+    const d = parseISODate(p.nextDate);
     if (d.getFullYear() === y && d.getMonth() === m) return sum + Number(p.price || 0);
     return sum;
   }, 0);
@@ -140,14 +140,25 @@ function fmtMoney(amount, cur = '₪') {
   return `${cur}${s}`;
 }
 
+// Parse YYYY-MM-DD as LOCAL midnight. `new Date(iso)` would treat the string
+// as UTC and getDate()/setHours() can land on the previous calendar day in
+// some timezones (and around DST boundaries). Always go through this helper
+// when reading nextDate strings.
+function parseISODate(iso) {
+  if (!iso) return new Date();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return new Date(iso);
+}
+
 function daysUntil(iso) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const d = new Date(iso); d.setHours(0,0,0,0);
+  const d = parseISODate(iso); d.setHours(0,0,0,0);
   return Math.round((d - today) / 86400000);
 }
 
 function fmtDateShort(iso) {
-  const d = new Date(iso);
+  const d = parseISODate(iso);
   const months = ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
@@ -216,23 +227,17 @@ function nextDateForMonthDay(month, day) {
 
 function monthFromDate(iso) {
   if (!iso) return new Date().getMonth();
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (m) return Number(m[2]) - 1;
-  return new Date(iso).getMonth();
+  return parseISODate(iso).getMonth();
 }
 
 // Parse YYYY-MM-DD strings directly to avoid UTC interpretation.
 function dayOfMonthFromDate(iso) {
   if (!iso) return new Date().getDate();
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (m) return Number(m[3]);
-  return new Date(iso).getDate();
+  return parseISODate(iso).getDate();
 }
 function dayOfWeekFromDate(iso) {
   if (!iso) return new Date().getDay();
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
-  return new Date(iso).getDay();
+  return parseISODate(iso).getDay();
 }
 
 // ----------------- Cross-cycle stats helpers -----------------
@@ -272,7 +277,7 @@ Object.assign(window, {
   SERVICE_CATALOG, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, ACCENT_PALETTE,
   seedPayments, getService, resolveService, isAutoPaid,
   paidThisMonth, plannedThisMonth,
-  fmtMoney, daysUntil, fmtDateShort, fmtRelative,
+  fmtMoney, daysUntil, fmtDateShort, fmtRelative, parseISODate,
   nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay,
   dayOfMonthFromDate, dayOfWeekFromDate, monthFromDate,
   lastDayOfMonth, fmtLocalISO, todayLocalISO,

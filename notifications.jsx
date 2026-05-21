@@ -42,7 +42,7 @@ function scanForReminders(payments, settings) {
   const seen = JSON.parse(localStorage.getItem('notif-seen') || '{}');
 
   payments.forEach(p => {
-    const due = new Date(p.nextDate); due.setHours(0, 0, 0, 0);
+    const due = parseISODate(p.nextDate); due.setHours(0, 0, 0, 0);
     const diff = Math.round((due - today) / 86400000);
     timings.forEach(timing => {
       if (diff === NOTIF_TIMING_DAYS[timing]) {

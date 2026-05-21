@@ -221,7 +221,7 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
   const upcoming = useMemo(() => {
     return [...payments]
       .filter(p => !isAutoPaid(p))
-      .sort((a, b) => new Date(a.nextDate) - new Date(b.nextDate));
+      .sort((a, b) => parseISODate(a.nextDate) - parseISODate(b.nextDate));
   }, [payments]);
 
   return (
@@ -429,7 +429,7 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
   const paymentsByDay = useMemo(() => {
     const map = {};
     payments.forEach(p => {
-      const d = new Date(p.nextDate);
+      const d = parseISODate(p.nextDate);
       if (d.getMonth() === cursor.getMonth() && d.getFullYear() === cursor.getFullYear()) {
         const day = d.getDate();
         if (!map[day]) map[day] = [];
