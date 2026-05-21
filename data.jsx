@@ -164,34 +164,53 @@ function fmtRelative(iso) {
 // For monthly/weekly cycles we let users pick a recurrence day instead of an
 // absolute date. The actual nextDate is computed as "the next time this day
 // falls on or after today".
+//
+// IMPORTANT: never use Date.toISOString() to derive a YYYY-MM-DD string here —
+// toISOString returns UTC and a local-midnight Date in Asia/Jerusalem
+// becomes the previous calendar day in UTC. Format the local components
+// directly instead.
 
 function lastDayOfMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+
+function fmtLocalISO(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function todayLocalISO() {
+  const t = new Date();
+  return fmtLocalISO(t.getFullYear(), t.getMonth(), t.getDate());
+}
 
 function nextDateForDayOfMonth(day) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const y = today.getFullYear(), m = today.getMonth();
   const clampedThis = Math.min(day, lastDayOfMonth(y, m));
   const thisMonth = new Date(y, m, clampedThis);
-  if (thisMonth >= today) return thisMonth.toISOString().slice(0, 10);
+  if (thisMonth >= today) return fmtLocalISO(y, m, clampedThis);
   const ny = m === 11 ? y + 1 : y;
   const nm = (m + 1) % 12;
   const clampedNext = Math.min(day, lastDayOfMonth(ny, nm));
-  return new Date(ny, nm, clampedNext).toISOString().slice(0, 10);
+  return fmtLocalISO(ny, nm, clampedNext);
 }
 
 function nextDateForDayOfWeek(weekday) { // 0 = Sunday
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const delta = (weekday - today.getDay() + 7) % 7; // 0 means today
+  const delta = (weekday - today.getDay() + 7) % 7;
   const d = new Date(today); d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+  return fmtLocalISO(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+// Parse YYYY-MM-DD strings directly to avoid UTC interpretation.
 function dayOfMonthFromDate(iso) {
   if (!iso) return new Date().getDate();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return Number(m[3]);
   return new Date(iso).getDate();
 }
 function dayOfWeekFromDate(iso) {
   if (!iso) return new Date().getDay();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay();
   return new Date(iso).getDay();
 }
 
@@ -234,7 +253,7 @@ Object.assign(window, {
   paidThisMonth, plannedThisMonth,
   fmtMoney, daysUntil, fmtDateShort, fmtRelative,
   nextDateForDayOfMonth, nextDateForDayOfWeek, dayOfMonthFromDate, dayOfWeekFromDate,
-  lastDayOfMonth,
+  lastDayOfMonth, fmtLocalISO, todayLocalISO,
   priceIn, monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
   CYCLE_PER_MONTH,
 });

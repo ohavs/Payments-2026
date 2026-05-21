@@ -517,7 +517,7 @@ function AddSheet({ open, onClose, onAdd }) {
       setNextDate(
         c === 'monthly' ? nextDateForDayOfMonth(today.getDate()) :
         c === 'weekly'  ? nextDateForDayOfWeek(today.getDay()) :
-        today.toISOString().slice(0, 10)
+        todayLocalISO()
       );
     }
   }, [picked?.id]);
@@ -588,10 +588,10 @@ function AddSheet({ open, onClose, onAdd }) {
             <div style={{ display: 'flex', gap: 8 }}>
               {CYCLE_ORDER.map(c => (<Chip key={c} active={cycle === c} onClick={() => {
                 const newDate = c === 'monthly'
-                  ? nextDateForDayOfMonth(dayOfMonthFromDate(nextDate || new Date().toISOString()))
+                  ? nextDateForDayOfMonth(dayOfMonthFromDate(nextDate || todayLocalISO()))
                   : c === 'weekly'
-                    ? nextDateForDayOfWeek(dayOfWeekFromDate(nextDate || new Date().toISOString()))
-                    : new Date().toISOString().slice(0, 10);
+                    ? nextDateForDayOfWeek(dayOfWeekFromDate(nextDate || todayLocalISO()))
+                    : todayLocalISO();
                 setCycle(c); setNextDate(newDate);
               }}>{CYCLE_LABEL[c]}</Chip>))}
             </div>
