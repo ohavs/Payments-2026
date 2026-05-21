@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -104,10 +104,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin — NETWORK FIRST always, fall back to cache only if offline.
-  // This ensures fresh code after every deploy.
+  // Same-origin — NETWORK FIRST, BYPASSING the browser HTTP cache so a Firebase
+  // Hosting Cache-Control header can't keep serving stale .jsx after a deploy.
+  // Fall back to the SW cache only if the network actually fails (offline).
   event.respondWith(
-    fetch(req).then((res) => {
+    fetch(req, { cache: 'no-store' }).then((res) => {
       if (res.ok) {
         const clone = res.clone();
         caches.open(VERSION).then((c) => c.put(req, clone));
