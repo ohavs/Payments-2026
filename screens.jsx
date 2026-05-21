@@ -41,48 +41,49 @@ function StatsCarousel({ pages }) {
           }}>{p}</div>
         ))}
       </div>
-      {/* Pagination dots */}
-      <div style={{
-        display: 'flex', justifyContent: 'center', gap: 6,
-        marginTop: 10,
-      }}>
-        {pages.map((_, i) => (
-          <span key={i} style={{
-            width: page === i ? 18 : 6, height: 6, borderRadius: 999,
-            background: page === i ? 'var(--accent)' : 'var(--surface-3)',
-            transition: 'width .25s cubic-bezier(.22,.61,.36,1), background .2s ease',
-          }} />
-        ))}
-      </div>
+      {/* Pagination dots — hidden when there's only one page */}
+      {pages.length > 1 && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', gap: 6,
+          marginTop: 10,
+        }}>
+          {pages.map((_, i) => (
+            <span key={i} style={{
+              width: page === i ? 18 : 6, height: 6, borderRadius: 999,
+              background: page === i ? 'var(--accent)' : 'var(--surface-3)',
+              transition: 'width .25s cubic-bezier(.22,.61,.36,1), background .2s ease',
+            }} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------- Stats detail sheet (totals breakdown) ----------
-function StatsDetailSheet({ open, onClose, payments }) {
+function StatsDetailSheet({ open, onClose, payments, currency = '₪', rates }) {
   const stats = React.useMemo(() => {
-    const monthly = totalsByMonthlyEquivalent(payments);
-    const perCycle = totalsPerCycle(payments);
+    const monthly = totalsByMonthlyEquivalent(payments, rates, currency);
+    const perCycle = totalsPerCycle(payments, rates, currency);
     const counts = countsPerCycle(payments);
     const yearly = monthly * 12;
 
-    const byMonthlyEq = payments.map(p => ({ p, eq: monthlyEquivalent(p) }))
+    const byMonthlyEq = payments.map(p => ({ p, eq: monthlyEquivalent(p, rates, currency) }))
       .sort((a, b) => b.eq - a.eq);
     const top = byMonthlyEq[0];
     const cheapest = byMonthlyEq[byMonthlyEq.length - 1];
     const avg = payments.length ? monthly / payments.length : 0;
 
-    // Group by category (via resolveService)
     const catTotals = {};
     payments.forEach(p => {
       const s = resolveService(p);
       const cat = s?.cat || 'other';
-      catTotals[cat] = (catTotals[cat] || 0) + monthlyEquivalent(p);
+      catTotals[cat] = (catTotals[cat] || 0) + monthlyEquivalent(p, rates, currency);
     });
     const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     return { monthly, yearly, perCycle, counts, top: top?.p, topEq: top?.eq, cheapest: cheapest?.p, cheapestEq: cheapest?.eq, avg, topCats };
-  }, [payments]);
+  }, [payments, rates, currency]);
 
   if (!payments.length) {
     return (
@@ -102,9 +103,9 @@ function StatsDetailSheet({ open, onClose, payments }) {
           background: 'var(--surface-2)', borderRadius: 22, padding: 20, marginBottom: 14,
           display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14,
         }}>
-          <BigStat label="חודשי" value={fmtMoney(stats.monthly)} />
-          <BigStat label="שנתי (צפי)" value={fmtMoney(stats.yearly)} />
-          <BigStat label="ממוצע לתשלום" value={fmtMoney(stats.avg)} />
+          <BigStat label="חודשי" value={fmtMoney(stats.monthly, currency)} />
+          <BigStat label="שנתי (צפי)" value={fmtMoney(stats.yearly, currency)} />
+          <BigStat label="ממוצע לתשלום" value={fmtMoney(stats.avg, currency)} />
           <BigStat label="סה״כ פעילים" value={String(payments.length)} />
         </div>
 
@@ -129,7 +130,7 @@ function StatsDetailSheet({ open, onClose, payments }) {
                   <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width .4s ease' }} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtMoney(sumRaw)} {c === 'monthly' ? 'בחודש' : c === 'weekly' ? 'בשבוע' : 'ביום'} · {fmtMoney(equiv)} שווה-ערך חודשי
+                  {fmtMoney(sumRaw, currency)} {c === 'monthly' ? 'בחודש' : c === 'weekly' ? 'בשבוע' : 'ביום'} · {fmtMoney(equiv, currency)} שווה-ערך חודשי
                 </div>
               </div>
             );
@@ -142,10 +143,10 @@ function StatsDetailSheet({ open, onClose, payments }) {
             דגשים
           </div>
           {stats.top && <HighlightRow icon="arrow-up-right" label="ההוצאה הגבוהה ביותר"
-            value={`${resolveService(stats.top)?.name || 'תשלום'} · ${fmtMoney(stats.topEq)}/ח'`} />}
+            value={`${resolveService(stats.top)?.name || 'תשלום'} · ${fmtMoney(stats.topEq, currency)}/ח'`} />}
           {stats.cheapest && stats.cheapest !== stats.top && (
             <HighlightRow icon="check" label="ההוצאה הקטנה ביותר"
-              value={`${resolveService(stats.cheapest)?.name || 'תשלום'} · ${fmtMoney(stats.cheapestEq)}/ח'`} />
+              value={`${resolveService(stats.cheapest)?.name || 'תשלום'} · ${fmtMoney(stats.cheapestEq, currency)}/ח'`} />
           )}
         </div>
 
@@ -163,7 +164,7 @@ function StatsDetailSheet({ open, onClose, payments }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                     <span style={{ fontSize: 13.5, fontWeight: 700 }}>{cat?.name || catId}</span>
                     <span style={{ fontSize: 12, color: 'var(--ink-dim)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                      {fmtMoney(sum)} · {pct}%
+                      {fmtMoney(sum, currency)} · {pct}%
                     </span>
                   </div>
                   <div style={{ height: 4, borderRadius: 999, background: 'var(--surface-3)', overflow: 'hidden' }}>
@@ -215,24 +216,12 @@ function HighlightRow({ icon, label, value }) {
 // and scrolls INTERNALLY (the page itself does NOT scroll).
 function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
   const [statsDetailOpen, setStatsDetailOpen] = useState(false);
-  // Upcoming = not auto-paid yet, sorted by date
+  const fx = useExchangeRates();
+  const currency = settings.defaultCurrency || '₪';
   const upcoming = useMemo(() => {
     return [...payments]
       .filter(p => !isAutoPaid(p))
       .sort((a, b) => new Date(a.nextDate) - new Date(b.nextDate));
-  }, [payments]);
-
-  // Stats for the yellow card
-  const stats = useMemo(() => {
-    const paid = paidThisMonth(payments);
-    const planned = plannedThisMonth(payments);
-    const today = new Date();
-    const m = today.getMonth(), y = today.getFullYear();
-    const paidCount = payments.filter(p => {
-      const d = new Date(p.nextDate);
-      return d.getFullYear() === y && d.getMonth() === m && d <= today;
-    }).length;
-    return { paid, planned, paidCount };
   }, [payments]);
 
   return (
@@ -243,12 +232,13 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
       <div style={{ padding: '0 18px', flexShrink: 0 }}>
         <Header onOpenAdd={onOpenAdd} user={user} fallbackName={settings.userName} />
         <StatsCarousel pages={[
-          <StatsCard key="paid" paid={stats.paid} planned={stats.planned} count={stats.paidCount} />,
-          <TotalsCard key="totals" payments={payments} onClick={() => setStatsDetailOpen(true)} />,
+          <TotalsCard key="totals" payments={payments} currency={currency} rates={fx?.rates}
+            onClick={() => setStatsDetailOpen(true)} />,
         ]} />
-        <SectionHeader title="מועדים קרובים" count={paymentsLoading ? null : upcoming.length} />
+        <SectionHeader title="תשלומים" count={paymentsLoading ? null : upcoming.length} />
       </div>
-      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)} payments={payments} />
+      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
+        payments={payments} currency={currency} rates={fx?.rates} />
 
       {paymentsLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 18px' }}>

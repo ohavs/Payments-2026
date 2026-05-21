@@ -198,19 +198,27 @@ function dayOfWeekFromDate(iso) {
 // ----------------- Cross-cycle stats helpers -----------------
 // Normalize each payment to its monthly equivalent so a total feels right
 // regardless of mix (daily × 30, weekly × ~4.33, monthly × 1).
+// If `rates` + `target` are passed, prices are also converted into the target
+// currency so a mixed-currency portfolio gives a single comparable number.
 const CYCLE_PER_MONTH = { monthly: 1, weekly: 30 / 7, daily: 30 };
 
-function monthlyEquivalent(payment) {
-  return Number(payment.price || 0) * (CYCLE_PER_MONTH[payment.cycle] || 1);
+function priceIn(payment, rates, target) {
+  const p = Number(payment.price || 0);
+  if (!rates || !target || !payment.currency || payment.currency === target) return p;
+  return window.convertCurrency ? window.convertCurrency(p, payment.currency, target, rates) : p;
 }
 
-function totalsByMonthlyEquivalent(payments) {
-  return payments.reduce((s, p) => s + monthlyEquivalent(p), 0);
+function monthlyEquivalent(payment, rates, target) {
+  return priceIn(payment, rates, target) * (CYCLE_PER_MONTH[payment.cycle] || 1);
 }
 
-function totalsPerCycle(payments) {
+function totalsByMonthlyEquivalent(payments, rates, target) {
+  return payments.reduce((s, p) => s + monthlyEquivalent(p, rates, target), 0);
+}
+
+function totalsPerCycle(payments, rates, target) {
   const t = { monthly: 0, weekly: 0, daily: 0 };
-  payments.forEach(p => { t[p.cycle] = (t[p.cycle] || 0) + Number(p.price || 0); });
+  payments.forEach(p => { t[p.cycle] = (t[p.cycle] || 0) + priceIn(p, rates, target); });
   return t;
 }
 
@@ -227,6 +235,6 @@ Object.assign(window, {
   fmtMoney, daysUntil, fmtDateShort, fmtRelative,
   nextDateForDayOfMonth, nextDateForDayOfWeek, dayOfMonthFromDate, dayOfWeekFromDate,
   lastDayOfMonth,
-  monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
+  priceIn, monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
   CYCLE_PER_MONTH,
 });

@@ -68,10 +68,11 @@ function StatsCard({ paid, planned, count, onClick }) {
   );
 }
 
-// Total recurring spend — monthly equivalent across all cycles.
+// Total recurring spend — monthly equivalent across all cycles, in the user's
+// default currency (mixed-currency portfolios are converted via live FX rates).
 // Click to open the detailed breakdown sheet.
-function TotalsCard({ payments, onClick }) {
-  const monthlyTotal = useMemo(() => totalsByMonthlyEquivalent(payments), [payments]);
+function TotalsCard({ payments, currency = '₪', rates, onClick }) {
+  const monthlyTotal = useMemo(() => totalsByMonthlyEquivalent(payments, rates, currency), [payments, rates, currency]);
   const counts = useMemo(() => countsPerCycle(payments), [payments]);
   const totalCount = payments.length;
 
@@ -114,7 +115,7 @@ function TotalsCard({ payments, onClick }) {
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative' }}>
         <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-          {fmtMoney(monthlyTotal)}
+          {fmtMoney(monthlyTotal, currency)}
         </div>
         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink-dim)' }}>/ חודש</div>
       </div>

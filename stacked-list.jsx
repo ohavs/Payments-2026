@@ -122,10 +122,9 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
             opacity: isExpanded ? 1 : 0,
             transform: isExpanded ? 'translateY(0)' : 'translateY(8px)',
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <Stat label="תאריך" value={fmtDateShort(payment.nextDate)} />
               <Stat label="תדירות" value={CYCLE_LABEL[payment.cycle]} />
-              <Stat label="סטטוס" value={paid ? 'שולם' : 'ממתין'} />
             </div>
             {payment.note && (
               <div style={{ fontSize: 12, opacity: .7, marginBottom: 12, lineHeight: 1.3 }}>

@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v7';
+const VERSION = 'v8';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -35,6 +35,7 @@ const APP_SHELL = [
   '/data.jsx',
   '/firebase-init.jsx',
   '/feedback.jsx',
+  '/fx.jsx',
   '/notifications.jsx',
   '/auth.jsx',
   '/payment-card.jsx',
