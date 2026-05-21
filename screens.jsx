@@ -130,7 +130,7 @@ function StatsDetailSheet({ open, onClose, payments, currency = '₪', rates }) 
                   <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width .4s ease' }} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtMoney(sumRaw, currency)} {c === 'monthly' ? 'בחודש' : c === 'weekly' ? 'בשבוע' : 'ביום'} · {fmtMoney(equiv, currency)} שווה-ערך חודשי
+                  {fmtMoney(sumRaw, currency)} {c === 'yearly' ? 'בשנה' : c === 'monthly' ? 'בחודש' : c === 'weekly' ? 'בשבוע' : 'ביום'} · {fmtMoney(equiv, currency)} שווה-ערך חודשי
                 </div>
               </div>
             );

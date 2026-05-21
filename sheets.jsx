@@ -39,6 +39,44 @@ function CyclePicker({ cycle, nextDate, onPickDate }) {
     );
   }
 
+  if (cycle === 'yearly') {
+    const currentMonth = nextDate ? monthFromDate(nextDate) : new Date().getMonth();
+    const currentDay = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
+    const maxDay = lastDayOfMonth(2024, currentMonth); // 2024 is a leap year — show full 29 in Feb
+    return (
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>חודש</div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginInline: -4, paddingInline: 4 }} className="hide-scroll">
+          {MONTH_NAMES_SHORT.map((mLbl, mIdx) => (
+            <button key={mIdx} onClick={() => onPickDate(nextDateForMonthDay(mIdx, currentDay))} style={{
+              padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: currentMonth === mIdx ? 'var(--accent)' : 'var(--surface-3)',
+              color: currentMonth === mIdx ? 'var(--accent-fg)' : 'var(--ink)',
+              fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+              flexShrink: 0, transition: 'background .15s ease',
+            }}>{mLbl}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 14, marginBottom: 10 }}>יום בחודש</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+          {Array.from({ length: maxDay }, (_, i) => i + 1).map(d => (
+            <button key={d} onClick={() => onPickDate(nextDateForMonthDay(currentMonth, d))} style={{
+              aspectRatio: '1 / 1', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: currentDay === d ? 'var(--accent)' : 'var(--surface-3)',
+              color: currentDay === d ? 'var(--accent-fg)' : 'var(--ink)',
+              fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+              fontVariantNumeric: 'tabular-nums',
+              transition: 'background .15s ease',
+            }}>{d}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
+          תיגבה כל {currentDay} ב{MONTH_NAMES_LONG[currentMonth]} · המועד הבא: {fmtDateShort(nextDate)}
+        </div>
+      </div>
+    );
+  }
+
   // monthly
   const currentDay = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
   return (
@@ -214,11 +252,14 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
             {CYCLE_ORDER.map(c => (
               <Chip key={c} active={draft.cycle === c} onClick={() => {
                 // Re-anchor nextDate against the new cycle so the picker shows a sane day
-                const newDate = c === 'monthly'
-                  ? nextDateForDayOfMonth(dayOfMonthFromDate(draft.nextDate))
-                  : c === 'weekly'
-                    ? nextDateForDayOfWeek(dayOfWeekFromDate(draft.nextDate))
-                    : draft.nextDate;
+                const m = monthFromDate(draft.nextDate);
+                const d = dayOfMonthFromDate(draft.nextDate);
+                const w = dayOfWeekFromDate(draft.nextDate);
+                const newDate =
+                  c === 'yearly'  ? nextDateForMonthDay(m, d) :
+                  c === 'monthly' ? nextDateForDayOfMonth(d) :
+                  c === 'weekly'  ? nextDateForDayOfWeek(w) :
+                  todayLocalISO();
                 update({ cycle: c, nextDate: newDate });
               }}>{CYCLE_LABEL[c]}</Chip>
             ))}
@@ -515,6 +556,7 @@ function AddSheet({ open, onClose, onAdd }) {
       // Default to a sensible next occurrence based on the cycle
       const today = new Date();
       setNextDate(
+        c === 'yearly'  ? nextDateForMonthDay(today.getMonth(), today.getDate()) :
         c === 'monthly' ? nextDateForDayOfMonth(today.getDate()) :
         c === 'weekly'  ? nextDateForDayOfWeek(today.getDay()) :
         todayLocalISO()
@@ -587,11 +629,15 @@ function AddSheet({ open, onClose, onAdd }) {
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תדירות</div>
             <div style={{ display: 'flex', gap: 8 }}>
               {CYCLE_ORDER.map(c => (<Chip key={c} active={cycle === c} onClick={() => {
-                const newDate = c === 'monthly'
-                  ? nextDateForDayOfMonth(dayOfMonthFromDate(nextDate || todayLocalISO()))
-                  : c === 'weekly'
-                    ? nextDateForDayOfWeek(dayOfWeekFromDate(nextDate || todayLocalISO()))
-                    : todayLocalISO();
+                const anchor = nextDate || todayLocalISO();
+                const m = monthFromDate(anchor);
+                const d = dayOfMonthFromDate(anchor);
+                const w = dayOfWeekFromDate(anchor);
+                const newDate =
+                  c === 'yearly'  ? nextDateForMonthDay(m, d) :
+                  c === 'monthly' ? nextDateForDayOfMonth(d) :
+                  c === 'weekly'  ? nextDateForDayOfWeek(w) :
+                  todayLocalISO();
                 setCycle(c); setNextDate(newDate);
               }}>{CYCLE_LABEL[c]}</Chip>))}
             </div>

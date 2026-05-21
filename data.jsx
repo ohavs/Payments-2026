@@ -76,8 +76,10 @@ function seedPayments() {
 }
 
 const CURRENCIES = ['₪', '$', '€', '£'];
-const CYCLE_LABEL = { monthly: 'חודשי', weekly: 'שבועי', daily: 'יומי' };
-const CYCLE_ORDER = ['monthly', 'weekly', 'daily'];
+const CYCLE_LABEL = { yearly: 'שנתי', monthly: 'חודשי', weekly: 'שבועי', daily: 'יומי' };
+const CYCLE_ORDER = ['yearly', 'monthly', 'weekly', 'daily'];
+const MONTH_NAMES_SHORT = ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יונ', 'יול', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+const MONTH_NAMES_LONG = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
 // Curated accent palette — used by Settings color picker AND the Tweaks panel
 const ACCENT_PALETTE = [
@@ -200,6 +202,25 @@ function nextDateForDayOfWeek(weekday) { // 0 = Sunday
   return fmtLocalISO(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+// Yearly: pick a month (0–11) + day. Returns the next occurrence of that
+// month/day on or after today.
+function nextDateForMonthDay(month, day) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const y = today.getFullYear();
+  const clampedThis = Math.min(day, lastDayOfMonth(y, month));
+  const thisYear = new Date(y, month, clampedThis);
+  if (thisYear >= today) return fmtLocalISO(y, month, clampedThis);
+  const clampedNext = Math.min(day, lastDayOfMonth(y + 1, month));
+  return fmtLocalISO(y + 1, month, clampedNext);
+}
+
+function monthFromDate(iso) {
+  if (!iso) return new Date().getMonth();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return Number(m[2]) - 1;
+  return new Date(iso).getMonth();
+}
+
 // Parse YYYY-MM-DD strings directly to avoid UTC interpretation.
 function dayOfMonthFromDate(iso) {
   if (!iso) return new Date().getDate();
@@ -219,7 +240,7 @@ function dayOfWeekFromDate(iso) {
 // regardless of mix (daily × 30, weekly × ~4.33, monthly × 1).
 // If `rates` + `target` are passed, prices are also converted into the target
 // currency so a mixed-currency portfolio gives a single comparable number.
-const CYCLE_PER_MONTH = { monthly: 1, weekly: 30 / 7, daily: 30 };
+const CYCLE_PER_MONTH = { yearly: 1 / 12, monthly: 1, weekly: 30 / 7, daily: 30 };
 
 function priceIn(payment, rates, target) {
   const p = Number(payment.price || 0);
@@ -236,13 +257,13 @@ function totalsByMonthlyEquivalent(payments, rates, target) {
 }
 
 function totalsPerCycle(payments, rates, target) {
-  const t = { monthly: 0, weekly: 0, daily: 0 };
+  const t = { yearly: 0, monthly: 0, weekly: 0, daily: 0 };
   payments.forEach(p => { t[p.cycle] = (t[p.cycle] || 0) + priceIn(p, rates, target); });
   return t;
 }
 
 function countsPerCycle(payments) {
-  const c = { monthly: 0, weekly: 0, daily: 0 };
+  const c = { yearly: 0, monthly: 0, weekly: 0, daily: 0 };
   payments.forEach(p => { c[p.cycle] = (c[p.cycle] || 0) + 1; });
   return c;
 }
@@ -252,8 +273,10 @@ Object.assign(window, {
   seedPayments, getService, resolveService, isAutoPaid,
   paidThisMonth, plannedThisMonth,
   fmtMoney, daysUntil, fmtDateShort, fmtRelative,
-  nextDateForDayOfMonth, nextDateForDayOfWeek, dayOfMonthFromDate, dayOfWeekFromDate,
+  nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay,
+  dayOfMonthFromDate, dayOfWeekFromDate, monthFromDate,
   lastDayOfMonth, fmtLocalISO, todayLocalISO,
+  MONTH_NAMES_SHORT, MONTH_NAMES_LONG,
   priceIn, monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
   CYCLE_PER_MONTH,
 });
