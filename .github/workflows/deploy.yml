@@ -1,0 +1,23 @@
+name: Deploy to Firebase Hosting
+
+# Every push to the served branch redeploys the site automatically.
+# Can also be triggered by hand from the Actions tab (workflow_dispatch).
+on:
+  push:
+    branches:
+      - claude/implement-payments-page-G9fij
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Firebase Hosting
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only hosting --project schedual-fdde7
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
