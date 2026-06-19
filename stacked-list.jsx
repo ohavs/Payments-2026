@@ -36,23 +36,31 @@ function StackedPaymentList({ payments, onOpenDetail }) {
         boxShadow: '0 14px 36px -18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.22)',
         overflow: 'hidden',
       }}>
-        {payments.map((p, i) => (
-          <PaymentRow
-            key={p.id}
-            payment={p}
-            index={i}
-            total={payments.length}
-            isExpanded={expandedId === p.id}
-            onTap={() => setExpandedId(prev => prev === p.id ? null : p.id)}
-            onOpenDetail={() => handleOpenDetail(p)}
-          />
-        ))}
+        {payments.map((p, i) => {
+          const paid = isAutoPaid(p);
+          // First row of the "already paid this month" block → render a soft
+          // divider strip above it so paid payments read as a distinct, calmer
+          // section instead of just fading away.
+          const isPaidSectionStart = paid && !(i > 0 && isAutoPaid(payments[i - 1]));
+          return (
+            <PaymentRow
+              key={p.id}
+              payment={p}
+              index={i}
+              total={payments.length}
+              isPaidSectionStart={isPaidSectionStart}
+              isExpanded={expandedId === p.id}
+              onTap={() => setExpandedId(prev => prev === p.id ? null : p.id)}
+              onOpenDetail={() => handleOpenDetail(p)}
+            />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) {
+function PaymentRow({ payment, index, total, isExpanded, isPaidSectionStart, onTap, onOpenDetail }) {
   const service = resolveService(payment);
   const paid = isAutoPaid(payment);
   const isLast = index === total - 1;
@@ -67,6 +75,28 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
     : 'inset 0 1px 0 rgba(255,255,255,.2)';
 
   return (
+    <React.Fragment>
+      {/* Soft separator strip introducing the "already paid this month" block. */}
+      {isPaidSectionStart && (
+        <div style={{
+          position: 'relative', zIndex: total + 2,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '12px 18px 9px',
+          background: 'rgba(0,0,0,.10)',
+          boxShadow: 'inset 0 1px 0 rgba(0,0,0,.10)',
+        }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 16, height: 16, borderRadius: 999, background: 'rgba(0,0,0,.22)',
+          }}>
+            <Icon name="check" size={10} strokeWidth={3} />
+          </span>
+          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.02em', opacity: .72 }}>
+            כבר שולם החודש
+          </span>
+          <span style={{ flex: 1, height: 1, background: 'rgba(0,0,0,.12)' }} />
+        </div>
+      )}
     <div
       onClick={onTap}
       style={{
@@ -75,18 +105,19 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
         background: isExpanded
           ? 'rgba(0,0,0,.16)'
           : `color-mix(in srgb, var(--accent-fg) ${darkOverlay}%, transparent)`,
-        boxShadow: liftShadow,
+        boxShadow: isPaidSectionStart ? 'inset 0 1px 0 rgba(255,255,255,.2)' : liftShadow,
         // Rounded top corners on every row except the first → combined with the
         // shadow above, each row reads as a discrete card lifting.
-        borderTopLeftRadius: index > 0 ? 18 : 0,
-        borderTopRightRadius: index > 0 ? 18 : 0,
+        borderTopLeftRadius: index > 0 && !isPaidSectionStart ? 18 : 0,
+        borderTopRightRadius: index > 0 && !isPaidSectionStart ? 18 : 0,
         // Negative top margin so the rounded lip overlaps the previous row,
-        // producing the "stacked / rising" silhouette.
-        marginTop: index > 0 ? -10 : 0,
+        // producing the "stacked / rising" silhouette. The first paid row sits
+        // flush under its divider strip instead of overlapping the row above.
+        marginTop: index > 0 && !isPaidSectionStart ? -10 : 0,
         // Later rows go higher so the lift shadow renders above the previous row.
         zIndex: index + 1,
-        transition: 'background .25s ease',
-        opacity: paid ? 0.6 : 1,
+        transition: 'background .25s ease, opacity .25s ease',
+        opacity: paid ? 0.52 : 1,
         WebkitTapHighlightColor: 'transparent',
       }}
     >
@@ -144,6 +175,7 @@ function PaymentRow({ payment, index, total, isExpanded, onTap, onOpenDetail }) 
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 }
 

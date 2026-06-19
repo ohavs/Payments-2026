@@ -218,10 +218,15 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
   const [statsDetailOpen, setStatsDetailOpen] = useState(false);
   const fx = useExchangeRates();
   const currency = settings.defaultCurrency || '₪';
+  // Show EVERY payment — nothing is hidden as the month progresses. Payments
+  // whose date already passed this cycle (auto-paid) sink to the bottom and are
+  // rendered dimmed, while still-upcoming ones stay on top, sorted by date.
   const upcoming = useMemo(() => {
-    return [...payments]
-      .filter(p => !isAutoPaid(p))
-      .sort((a, b) => parseISODate(a.nextDate) - parseISODate(b.nextDate));
+    return [...payments].sort((a, b) => {
+      const pa = isAutoPaid(a), pb = isAutoPaid(b);
+      if (pa !== pb) return pa ? 1 : -1; // upcoming first, paid last
+      return parseISODate(a.nextDate) - parseISODate(b.nextDate);
+    });
   }, [payments]);
 
   return (
