@@ -5,7 +5,7 @@
 
 const AUTO_COLLAPSE_MS = 3000;
 
-function StackedPaymentList({ payments, onOpenDetail }) {
+function StackedPaymentList({ payments, onOpenDetail, embedded }) {
   const [expandedId, setExpandedId] = useState(null);
   const timerRef = useRef(null);
 
@@ -21,13 +21,19 @@ function StackedPaymentList({ payments, onOpenDetail }) {
     setTimeout(() => onOpenDetail(p), 80);
   };
 
+  // Embedded mode: flow inside a shared scroll container (the parent scrolls).
+  // Standalone mode: be the scroll container itself (flex-fill + internal scroll).
+  const outerStyle = embedded
+    ? { padding: '2px 0 8px' }
+    : {
+        flex: 1, minHeight: 0,
+        overflowY: 'auto', overflowX: 'hidden',
+        padding: '4px 18px 140px',
+        WebkitOverflowScrolling: 'touch',
+      };
+
   return (
-    <div className="hide-scroll" style={{
-      flex: 1, minHeight: 0,
-      overflowY: 'auto', overflowX: 'hidden',
-      padding: '4px 18px 140px',
-      WebkitOverflowScrolling: 'touch',
-    }}>
+    <div className="hide-scroll" style={outerStyle}>
       {/* The single container — continuous rounded shell around all rows */}
       <div className="glass-accent" style={{
         borderRadius: 24,
