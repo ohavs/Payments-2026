@@ -346,11 +346,12 @@ function ListItemRow({ item, first, onToggle, onOpen }) {
 }
 
 // ---------- Shared inputs ----------
-function FieldInput({ value, onChange, placeholder, type = 'text', autoFocus, onEnter, dir }) {
+function FieldInput({ value, onChange, placeholder, type = 'text', onEnter, dir, inputRef }) {
   return (
     <input
+      ref={inputRef}
       value={value} onChange={e => onChange(e.target.value)}
-      placeholder={placeholder} type={type} autoFocus={autoFocus} dir={dir}
+      placeholder={placeholder} type={type} dir={dir}
       onKeyDown={e => { if (e.key === 'Enter' && onEnter) onEnter(); }}
       style={{
         width: '100%', background: 'var(--surface-2)', border: 'none', outline: 'none',
@@ -387,9 +388,19 @@ function AddListItemSheet({ open, onClose, groups, defaultGroup, onAdd }) {
   const [title, setTitle] = React.useState('');
   const [group, setGroup] = React.useState(defaultGroup || groups[0]);
   const [amount, setAmount] = React.useState('');
+  const titleRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (open) { setTitle(''); setAmount(''); setGroup(defaultGroup || groups[0]); }
+    if (!open) return;
+    setTitle(''); setAmount(''); setGroup(defaultGroup || groups[0]);
+    // Focus the field only once the sheet is actually open and on-screen, and
+    // never let it scroll the page. Auto-focusing an off-screen input (the sheet
+    // is always mounted) would scroll the whole app and drag hidden sheets into
+    // view — the cause of the "stuck panel on entry" bug.
+    const id = setTimeout(() => {
+      try { titleRef.current && titleRef.current.focus({ preventScroll: true }); } catch (e) {}
+    }, 360);
+    return () => clearTimeout(id);
   }, [open, defaultGroup]);
 
   const submit = () => {
@@ -403,7 +414,7 @@ function AddListItemSheet({ open, onClose, groups, defaultGroup, onAdd }) {
       <div style={{ padding: '18px 22px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <Label>שם הפריט</Label>
-          <FieldInput value={title} onChange={setTitle} placeholder="למשל: חלב, סוללות..." autoFocus onEnter={submit} />
+          <FieldInput inputRef={titleRef} value={title} onChange={setTitle} placeholder="למשל: חלב, סוללות..." onEnter={submit} />
         </div>
         <div>
           <Label>קבוצה</Label>
