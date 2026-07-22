@@ -104,16 +104,67 @@ function IconButton({ name, onClick, size = 40, iconSize = 20, bg = 'var(--surfa
   );
 }
 
-// Bottom sheet — slides up from bottom, full overlay
+// Bottom sheet — slides up from bottom, full overlay.
+// Supports drag-down-to-close (swipe the sheet down past a threshold to dismiss)
+// and contains overscroll so pulling it down never triggers the browser's
+// pull-to-refresh on the page behind it.
 function Sheet({ open, onClose, title, children, height = '88%' }) {
   // Defer applying the transition until after first paint, so the initial
   // render of `transform: translateY(100%)` settles before we animate to 0.
-  // Without this the transition can stick at frame 0 in some environments.
   const [animReady, setAnimReady] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const panelRef = useRef(null);
+  const scrollRef = useRef(null);
+
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimReady(true));
     return () => cancelAnimationFrame(id);
   }, []);
+  // Reset any drag offset whenever the sheet opens/closes.
+  useEffect(() => { setDragY(0); setDragging(false); }, [open]);
+
+  // Native touch listeners (passive:false) so we can preventDefault the browser
+  // pull-to-refresh while dragging the sheet down.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    let startY = 0, active = false, cur = 0;
+    const ts = (e) => {
+      if (!open || e.touches.length !== 1) return;
+      active = true; startY = e.touches[0].clientY; cur = 0;
+    };
+    const tm = (e) => {
+      if (!active) return;
+      const dy = e.touches[0].clientY - startY;
+      const atTop = !scrollRef.current || scrollRef.current.scrollTop <= 0;
+      if (dy > 0 && atTop) {
+        cur = dy; setDragY(dy); setDragging(true);
+        if (e.cancelable) e.preventDefault(); // block pull-to-refresh
+      } else if (dy < -2) {
+        active = false; setDragY(0); setDragging(false);
+      }
+    };
+    const te = () => {
+      if (!active) return;
+      active = false; setDragging(false);
+      if (cur > 110) onClose(); else setDragY(0);
+    };
+    el.addEventListener('touchstart', ts, { passive: true });
+    el.addEventListener('touchmove', tm, { passive: false });
+    el.addEventListener('touchend', te, { passive: true });
+    el.addEventListener('touchcancel', te, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', ts);
+      el.removeEventListener('touchmove', tm);
+      el.removeEventListener('touchend', te);
+      el.removeEventListener('touchcancel', te);
+    };
+  }, [open, onClose]);
+
+  const translate = open ? `translateY(${dragY}px)` : 'translateY(100%)';
+  const panelTransition = dragging ? 'none' : (animReady ? 'transform .32s cubic-bezier(.22,.61,.36,1)' : 'none');
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 100,
@@ -122,19 +173,20 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
       <div onClick={onClose} style={{
         position: 'absolute', inset: 0,
         background: 'rgba(0,0,0,.55)',
-        opacity: open ? 1 : 0,
-        transition: animReady ? 'opacity .25s ease' : 'none',
+        opacity: open ? Math.max(0, 1 - dragY / 500) : 0,
+        transition: dragging ? 'none' : (animReady ? 'opacity .25s ease' : 'none'),
       }} />
-      <div style={{
+      <div ref={panelRef} style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
         height: height,
         background: 'var(--surface-1)',
         color: 'var(--ink)',
         borderTopLeftRadius: 28, borderTopRightRadius: 28,
-        transform: open ? 'translateY(0)' : 'translateY(100%)',
-        transition: animReady ? 'transform .32s cubic-bezier(.22,.61,.36,1)' : 'none',
+        transform: translate,
+        transition: panelTransition,
         display: 'flex', flexDirection: 'column',
         boxShadow: '0 -20px 50px rgba(0,0,0,.3)',
+        touchAction: 'pan-y',
       }}>
         {/* Sticky header: handle + title + close */}
         <div style={{
@@ -167,7 +219,7 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
             </div>
           )}
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}>
           {children}
         </div>
       </div>
