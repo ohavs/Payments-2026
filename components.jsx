@@ -121,24 +121,38 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
     const id = requestAnimationFrame(() => setAnimReady(true));
     return () => cancelAnimationFrame(id);
   }, []);
-  // Reset any drag offset whenever the sheet opens/closes.
-  useEffect(() => { setDragY(0); setDragging(false); }, [open]);
+  // Reset any drag offset whenever the sheet opens/closes; dismiss the keyboard
+  // when the sheet closes (covers close via button / backdrop / drag).
+  useEffect(() => {
+    setDragY(0); setDragging(false);
+    if (!open) {
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
+    }
+  }, [open]);
 
   // Native touch listeners (passive:false) so we can preventDefault the browser
   // pull-to-refresh while dragging the sheet down.
   useEffect(() => {
     const el = panelRef.current;
     if (!el) return;
-    let startY = 0, active = false, cur = 0;
+    let startY = 0, active = false, cur = 0, blurred = false;
     const ts = (e) => {
       if (!open || e.touches.length !== 1) return;
-      active = true; startY = e.touches[0].clientY; cur = 0;
+      active = true; startY = e.touches[0].clientY; cur = 0; blurred = false;
     };
     const tm = (e) => {
       if (!active) return;
       const dy = e.touches[0].clientY - startY;
       const atTop = !scrollRef.current || scrollRef.current.scrollTop <= 0;
       if (dy > 0 && atTop) {
+        // Dismiss the keyboard as soon as a downward drag begins, so pulling the
+        // sheet down closes the keyboard too (not just the sheet).
+        if (!blurred) {
+          const ae = document.activeElement;
+          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.blur();
+          blurred = true;
+        }
         cur = dy; setDragY(dy); setDragging(true);
         if (e.cancelable) e.preventDefault(); // block pull-to-refresh
       } else if (dy < -2) {
