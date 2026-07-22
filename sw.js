@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v15';
+const VERSION = 'v16';
 const APP_SHELL = [
   '/',
   '/payments.html',
