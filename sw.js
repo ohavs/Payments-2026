@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v12';
+const VERSION = 'v13';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -42,6 +42,7 @@ const APP_SHELL = [
   '/screens.jsx',
   '/sheets.jsx',
   '/stacked-list.jsx',
+  '/lists.jsx',
   '/tweaks-panel.jsx',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
@@ -114,6 +115,12 @@ self.addEventListener('fetch', (event) => {
         caches.open(VERSION).then((c) => c.put(req, clone));
       }
       return res;
-    }).catch(() => caches.match(req).then((hit) => hit || caches.match('/payments.html')))
+    }).catch(() => caches.match(req).then((hit) => {
+      if (hit) return hit;
+      // Only fall back to the HTML shell for page navigations. Never serve HTML
+      // in place of a missing .jsx/asset — that would execute as JS and crash.
+      if (req.mode === 'navigate') return caches.match('/payments.html');
+      return Response.error();
+    }))
   );
 });
