@@ -25,7 +25,16 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy hosting + Firestore rules
-        run: npx --yes firebase-tools@latest deploy --only hosting,firestore:rules,firestore:indexes --project schedual-fdde7 --non-interactive
+      # Hosting deploys first and on its own, so the live app always updates —
+      # a Firestore-rules permission hiccup can never block the site itself.
+      - name: Deploy hosting
+        run: npx --yes firebase-tools@latest deploy --only hosting --project schedual-fdde7 --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      # Rules deploy separately. If this step fails (e.g. IAM still propagating),
+      # the app is already live; just re-run the job once rules can deploy.
+      - name: Deploy Firestore rules
+        run: npx --yes firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project schedual-fdde7 --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
