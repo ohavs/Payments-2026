@@ -183,59 +183,24 @@ function ListCard({ payment, onClick, accent }) {
   );
 }
 
-// Section header. Optionally collapsible (tap the title to fold the section)
-// and can carry an "add" button glued right next to the title word.
-function SectionHeader({ title, count, total, action, onAction, collapsible, collapsed, onToggle, onAdd, addLabel, rightNode }) {
-  const titleInner = (
-    <>
-      <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
-        {title}
-      </h3>
-      {collapsible && (
-        <span style={{
-          display: 'inline-flex', color: 'var(--ink-dim)',
-          transition: 'transform .2s ease',
-          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-        }}>
-          <Icon name="chevron-down" size={18} />
-        </span>
-      )}
-    </>
-  );
+// Section header
+function SectionHeader({ title, count, total, action, onAction }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
       padding: '8px 4px 12px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {collapsible ? (
-          <button onClick={onToggle} aria-expanded={!collapsed} style={{
-            background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            color: 'var(--ink)', padding: 0, display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            {titleInner}
-          </button>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{titleInner}</div>
-        )}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          {title}
+        </h3>
         {count != null && (
           <span style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600 }}>
             {count}
           </span>
         )}
-        {onAdd && (
-          <button onClick={onAdd} aria-label={addLabel || 'הוסף'} title={addLabel || 'הוסף'} style={{
-            width: 26, height: 26, borderRadius: '50%', border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: 'var(--accent-fg)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginInlineStart: 2, flexShrink: 0,
-            boxShadow: '0 4px 12px -4px rgba(0,0,0,.4)',
-          }}>
-            <Icon name="plus" size={15} strokeWidth={2.6} />
-          </button>
-        )}
       </div>
-      {rightNode ? rightNode : total != null ? (
+      {total != null ? (
         <div style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
           סה״כ {fmtMoney(total)}
         </div>

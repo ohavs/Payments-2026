@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v13';
+const VERSION = 'v14';
 const APP_SHELL = [
   '/',
   '/payments.html',
@@ -42,7 +42,6 @@ const APP_SHELL = [
   '/screens.jsx',
   '/sheets.jsx',
   '/stacked-list.jsx',
-  '/lists.jsx',
   '/tweaks-panel.jsx',
   '/manifest.webmanifest',
   '/icons/icon-192.png',

@@ -216,12 +216,8 @@ function HighlightRow({ icon, label, value }) {
 // and scrolls INTERNALLY (the page itself does NOT scroll).
 function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
   const [statsDetailOpen, setStatsDetailOpen] = useState(false);
-  // Collapse state for each home section — persisted per device so the choice
-  // survives reloads. Tap a section title to fold/unfold it.
-  const [paymentsCollapsed, setPaymentsCollapsed] = usePersistentFlag('home.paymentsCollapsed', false);
   const fx = useExchangeRates();
   const currency = settings.defaultCurrency || '₪';
-  const lists = useLists(user?.uid, user);
   // Show EVERY payment — nothing is hidden as the month progresses. Payments
   // whose date already passed this cycle (auto-paid) sink to the bottom and are
   // rendered dimmed, while still-upcoming ones stay on top, sorted by date.
@@ -240,66 +236,33 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
     }}>
       <div style={{ padding: '0 18px', flexShrink: 0 }}>
         <Header onOpenAdd={onOpenAdd} user={user} fallbackName={settings.userName} />
-      </div>
-
-      {/* Single scroll surface holding the stats card + both sections. */}
-      <div className="hide-scroll" style={{
-        flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
-        padding: '0 18px 140px', WebkitOverflowScrolling: 'touch',
-      }}>
         <StatsCarousel pages={[
           <TotalsCard key="totals" payments={payments} currency={currency} rates={fx?.rates}
             onClick={() => setStatsDetailOpen(true)} />,
         ]} />
-
-        {/* ---- Payments ---- (tap the title to collapse the whole list) */}
-        <SectionHeader title="תשלומים" count={paymentsLoading ? null : upcoming.length}
-          collapsible collapsed={paymentsCollapsed}
-          onToggle={() => setPaymentsCollapsed(v => !v)} />
-        {!paymentsCollapsed && (
-          paymentsLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-              <Spinner size={28} color="var(--accent)" />
-            </div>
-          ) : upcoming.length > 0 ? (
-            <StackedPaymentList payments={upcoming} onOpenDetail={onOpenPayment} embedded />
-          ) : (
-            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-dim)' }}>
-              <div style={{ fontSize: 14, marginBottom: 12 }}>אין תשלומים קרובים</div>
-              <button onClick={onOpenAdd} style={{
-                background: 'var(--accent)', color: 'var(--accent-fg)',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                padding: '10px 18px', borderRadius: 999, fontWeight: 700, fontSize: 14,
-              }}>הוסף תשלום ראשון</button>
-            </div>
-          )
-        )}
-
-        {/* ---- Free-form lists (shopping & misc, shareable) ---- */}
-        <div style={{ height: 10 }} />
-        <ExpenseListSection lists={lists} user={user} />
+        <SectionHeader title="תשלומים" count={paymentsLoading ? null : upcoming.length} />
       </div>
-
       <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
         payments={payments} currency={currency} rates={fx?.rates} />
+
+      {paymentsLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 18px' }}>
+          <Spinner size={28} color="var(--accent)" />
+        </div>
+      ) : upcoming.length > 0 ? (
+        <StackedPaymentList payments={upcoming} onOpenDetail={onOpenPayment} />
+      ) : (
+        <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-dim)' }}>
+          <div style={{ fontSize: 14, marginBottom: 12 }}>אין תשלומים קרובים</div>
+          <button onClick={onOpenAdd} style={{
+            background: 'var(--accent)', color: 'var(--accent-fg)',
+            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '10px 18px', borderRadius: 999, fontWeight: 700, fontSize: 14,
+          }}>הוסף תשלום ראשון</button>
+        </div>
+      )}
     </div>
   );
-}
-
-// Small persisted boolean flag backed by localStorage (per device).
-function usePersistentFlag(key, initial) {
-  const [val, setVal] = useState(() => {
-    try { const v = localStorage.getItem(key); return v == null ? initial : v === '1'; }
-    catch { return initial; }
-  });
-  const set = React.useCallback((next) => {
-    setVal(prev => {
-      const resolved = typeof next === 'function' ? next(prev) : next;
-      try { localStorage.setItem(key, resolved ? '1' : '0'); } catch {}
-      return resolved;
-    });
-  }, [key]);
-  return [val, set];
 }
 
 // Variation A: Stacked sections
