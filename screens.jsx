@@ -250,6 +250,7 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
         <StatsCarousel pages={[
           <TotalsCard key="totals" payments={payments} currency={currency} rates={fx?.rates}
             onClick={() => setStatsDetailOpen(true)} />,
+          <ExpensesStatsCard key="expenses" lists={lists} />,
         ]} />
 
         {/* ---- Payments ---- (tap the title to collapse the whole list) */}

@@ -4,12 +4,31 @@
 //
 // Schema:
 //   lists/{id}            → { name, ownerUid, members[], memberInfo{}, groups[](=categories), createdAt }
-//   lists/{id}/items/{id} → { title, group(=category), amount, note, createdAt }
+//   lists/{id}/items/{id} → { title, group(=category), amount, note, date(YYYY-MM-DD), createdAt }
 //
 // Sharing: the list id itself is the unguessable invite code (see firestore.rules).
 
 const DEFAULT_CATEGORIES = ['קניות', 'ביטוחים', 'אוכל בחוץ', 'שונות'];
 const MONTH_NAMES_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+const DAY_NAMES_HE = ['א','ב','ג','ד','ה','ו','ש'];
+
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function localISO(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function todayISO() { return localISO(new Date()); }
+function fmtDateHe(d) { return `${d.getDate()} ב${MONTH_NAMES_HE[d.getMonth()]}`; }
+function fmtDateHeFull(d) { return `${d.getDate()} ב${MONTH_NAMES_HE[d.getMonth()]} ${d.getFullYear()}`; }
+
+function tsToDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
+  if (typeof ts.toDate === 'function') return ts.toDate();
+  return null;
+}
+// The date an expense is filed under: its explicit date, else its createdAt.
+function expenseDate(it) {
+  if (it.date) return parseISODate(it.date);
+  return tsToDate(it.createdAt) || new Date();
+}
 
 // localStorage-backed boolean, scoped per device.
 function useStickyState(key, initial) {
@@ -25,21 +44,6 @@ function useStickyState(key, initial) {
     });
   }, [key]);
   return [val, set];
-}
-
-function tsToDate(ts) {
-  if (!ts) return null;
-  if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000);
-  if (typeof ts.toDate === 'function') return ts.toDate();
-  return null;
-}
-// An expense belongs to "this month" if it has no timestamp yet (just added) or
-// its createdAt falls in the current calendar month.
-function isThisMonth(it) {
-  const d = tsToDate(it.createdAt);
-  if (!d) return true;
-  const now = new Date();
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 }
 
 // ---------- Data hook ----------
@@ -89,7 +93,7 @@ function useLists(uid, user) {
     const unsub = fbDb.collection('lists').doc(activeListId).collection('items')
       .onSnapshot((snap) => {
         const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rows.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)); // newest first
+        rows.sort((a, b) => (expenseDate(b) - expenseDate(a)) || ((b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
         setItems(rows);
       }, (err) => console.error('expense items subscribe error', err));
     return () => unsub();
@@ -103,6 +107,7 @@ function useLists(uid, user) {
   const ops = React.useMemo(() => {
     const col = () => fbDb.collection('lists');
     const meInfo = () => ({ name: user?.displayName || '', email: user?.email || '' });
+    const cleanAmount = (a) => (a === '' || a == null) ? 0 : Number(a);
     return {
       createList: async (name) => {
         const ref = await col().add({
@@ -125,14 +130,15 @@ function useLists(uid, user) {
       addItem: (id, item) => col().doc(id).collection('items').add({
         title: (item.title || '').trim(),
         group: item.group || '',
-        amount: (item.amount === '' || item.amount == null) ? 0 : Number(item.amount),
+        amount: cleanAmount(item.amount),
         note: (item.note || '').trim(),
+        date: item.date || todayISO(),
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       }),
       updateItem: (id, item) => {
         const { id: itemId, ...rest } = item;
         const data = { ...rest };
-        if ('amount' in data) data.amount = (data.amount === '' || data.amount == null) ? 0 : Number(data.amount);
+        if ('amount' in data) data.amount = cleanAmount(data.amount);
         if ('title' in data) data.title = (data.title || '').trim();
         if ('note' in data) data.note = (data.note || '').trim();
         return col().doc(id).collection('items').doc(itemId).set(data, { merge: true });
@@ -162,6 +168,22 @@ function useLists(uid, user) {
   return { loading, lists, activeList, activeListId, setActiveListId, items, ops };
 }
 
+// Compute per-category + overall totals for a set of expenses.
+function computeStats(items, categories) {
+  const totals = {}; categories.forEach(c => { totals[c] = 0; });
+  let overall = 0; let extra = 0;
+  items.forEach(it => {
+    const amt = Number(it.amount) || 0;
+    overall += amt;
+    if (it.group && totals[it.group] != null) totals[it.group] += amt;
+    else extra += amt;
+  });
+  const rows = categories.map(c => ({ cat: c, sum: totals[c] })).filter(r => r.sum > 0);
+  if (extra > 0) rows.push({ cat: 'ללא קטגוריה', sum: extra });
+  rows.sort((a, b) => b.sum - a.sum);
+  return { overall, rows };
+}
+
 // ---------- Home section ----------
 function ExpenseListSection({ lists }) {
   const { loading, activeList, activeListId, items, ops } = lists;
@@ -170,17 +192,19 @@ function ExpenseListSection({ lists }) {
   const [editItem, setEditItem] = React.useState(null);
   const [manageOpen, setManageOpen] = React.useState(false);
   const [addCat, setAddCat] = React.useState(null);
+  const [view, setView] = React.useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const toast = useToast();
 
   const categories = (activeList?.groups && activeList.groups.length) ? activeList.groups : DEFAULT_CATEGORIES;
   const shared = (activeList?.members?.length || 1) > 1;
-  const monthLabel = MONTH_NAMES_HE[new Date().getMonth()];
 
-  // Only this month's expenses.
-  const monthItems = React.useMemo(() => items.filter(isThisMonth), [items]);
+  const monthItems = React.useMemo(() => items.filter(it => {
+    const d = expenseDate(it);
+    return d.getFullYear() === view.y && d.getMonth() === view.m;
+  }), [items, view.y, view.m]);
+
   const total = monthItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
 
-  // Group by category + per-category totals (categories with no expenses are hidden).
   const buckets = React.useMemo(() => {
     const map = {}; const totals = {};
     categories.forEach(c => { map[c] = []; totals[c] = 0; });
@@ -193,6 +217,13 @@ function ExpenseListSection({ lists }) {
     return { map, totals, extra, extraTotal };
   }, [monthItems, categories.join('|')]);
 
+  const shiftMonth = (delta) => setView(v => {
+    const d = new Date(v.y, v.m + delta, 1);
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const now = new Date();
+  const isCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
+
   const manageBtn = (
     <button onClick={() => setManageOpen(true)} aria-label="ניהול הוצאות" style={{
       width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
@@ -204,6 +235,9 @@ function ExpenseListSection({ lists }) {
   );
 
   const openAdd = (cat) => { setAddCat(cat || categories[0]); setAddOpen(true); };
+
+  const orderedCats = categories.filter(c => (buckets.map[c] || []).length);
+  const showExtra = buckets.extra.length > 0;
 
   return (
     <div>
@@ -223,45 +257,45 @@ function ExpenseListSection({ lists }) {
             <Spinner size={24} color="var(--accent)" />
           </div>
         ) : (
-          <div style={{ background: 'var(--surface-1)', borderRadius: 20, overflow: 'hidden' }}>
-            {/* Month total header */}
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              padding: '15px 16px 13px', borderBottom: '1px solid var(--divider)',
-            }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-dim)' }}>סה״כ החודש</div>
-                <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 2 }}>
-                  {monthLabel}{shared ? ` · משותף · ${activeList.members.length} חשבונות` : ''}
+          <div style={{ background: 'var(--surface-1)', borderRadius: 22, overflow: 'hidden' }}>
+            {/* Month navigator + total */}
+            <div style={{ padding: '14px 16px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 }}>
+                <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-2)" onClick={() => shiftMonth(-1)} />
+                <div style={{ minWidth: 128, textAlign: 'center', fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.01em' }}>
+                  {MONTH_NAMES_HE[view.m]} {view.y}
                 </div>
+                <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-2)"
+                  onClick={() => shiftMonth(1)} style={{ opacity: isCurrentMonth ? .4 : 1 }} />
               </div>
-              <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtMoney(total)}
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
+                  סה״כ{shared ? ` · משותף · ${activeList.members.length}` : ''}
+                </div>
+                <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtMoney(total)}
+                </div>
               </div>
             </div>
 
             {monthItems.length === 0 ? (
-              <div style={{ padding: '26px 18px', textAlign: 'center', color: 'var(--ink-dim)' }}>
-                <div style={{ fontSize: 14, marginBottom: 12 }}>אין הוצאות החודש</div>
+              <div style={{ padding: '22px 18px 26px', textAlign: 'center', color: 'var(--ink-dim)', borderTop: '1px solid var(--divider)' }}>
+                <div style={{ fontSize: 14, marginBottom: 12 }}>אין הוצאות {isCurrentMonth ? 'החודש' : 'בחודש זה'}</div>
                 <button onClick={() => openAdd()} style={{
                   background: 'var(--accent)', color: 'var(--accent-fg)', border: 'none',
                   cursor: 'pointer', fontFamily: 'inherit', padding: '9px 16px',
                   borderRadius: 999, fontWeight: 700, fontSize: 13.5,
-                }}>הוסף הוצאה ראשונה</button>
+                }}>הוסף הוצאה</button>
               </div>
             ) : (
               <>
-                {categories.map((c) => {
-                  const list = buckets.map[c] || [];
-                  if (!list.length) return null;
-                  return (
-                    <CategoryBlock key={c} label={c} sum={buckets.totals[c]} items={list}
-                      onAdd={() => openAdd(c)} onOpen={(it) => setEditItem(it)} />
-                  );
-                })}
-                {buckets.extra.length > 0 && (
+                {orderedCats.map((c, i) => (
+                  <CategoryBlock key={c} label={c} sum={buckets.totals[c]} items={buckets.map[c]} first={i === 0}
+                    onAdd={() => openAdd(c)} onOpen={(it) => setEditItem(it)} />
+                ))}
+                {showExtra && (
                   <CategoryBlock label="ללא קטגוריה" sum={buckets.extraTotal} items={buckets.extra}
-                    onOpen={(it) => setEditItem(it)} />
+                    first={orderedCats.length === 0} onOpen={(it) => setEditItem(it)} />
                 )}
               </>
             )}
@@ -275,7 +309,7 @@ function ExpenseListSection({ lists }) {
 
       <EditExpenseSheet open={!!editItem} onClose={() => setEditItem(null)}
         item={editItem} categories={categories}
-        onSave={(item) => { ops.updateItem(activeListId, item); setEditItem(null); }}
+        onSave={(item) => { ops.updateItem(activeListId, item); setEditItem(null); toast('נשמר', { type: 'success' }); }}
         onDelete={(id) => { ops.removeItem(activeListId, id); setEditItem(null); toast('נמחק', { type: 'info' }); }} />
 
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
@@ -283,40 +317,47 @@ function ExpenseListSection({ lists }) {
   );
 }
 
-function CategoryBlock({ label, sum, items, onAdd, onOpen }) {
+// A category: a clear, larger header + its expenses grouped beneath it.
+// Categories are separated by a divider; rows inside a category are not, so the
+// grouping reads correctly (N expenses look like N rows under one heading).
+function CategoryBlock({ label, sum, items, onAdd, onOpen, first }) {
   return (
-    <div>
+    <div style={{ borderTop: first ? '1px solid var(--divider)' : '6px solid var(--surface-2)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px 6px',
+        padding: '13px 16px 7px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.03em', color: 'var(--ink-dim)', textTransform: 'uppercase' }}>{label}</span>
+          <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.01em' }}>{label}</span>
           {onAdd && (
             <button onClick={onAdd} aria-label={`הוסף ל${label}`} style={{
-              background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-dim)',
-              display: 'inline-flex', alignItems: 'center', padding: 2,
+              width: 22, height: 22, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              background: 'var(--surface-2)', color: 'var(--ink-dim)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Icon name="plus" size={14} strokeWidth={2.6} />
+              <Icon name="plus" size={13} strokeWidth={2.8} />
             </button>
           )}
         </div>
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
           {fmtMoney(sum)}
         </span>
       </div>
-      {items.map((it, i) => (
-        <ExpenseRow key={it.id} item={it} first={i === 0} onOpen={() => onOpen(it)} />
-      ))}
+      <div style={{ paddingBottom: 6 }}>
+        {items.map((it) => (
+          <ExpenseRow key={it.id} item={it} onOpen={() => onOpen(it)} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function ExpenseRow({ item, first, onOpen }) {
+function ExpenseRow({ item, onOpen }) {
+  const d = expenseDate(item);
+  const meta = [fmtDateHe(d), item.note].filter(Boolean).join(' · ');
   return (
     <button onClick={onOpen} style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 16px',
-      borderTop: first ? 'none' : '1px solid var(--divider)',
+      width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px',
       background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
       color: 'var(--ink)', textAlign: 'start',
     }}>
@@ -325,14 +366,70 @@ function ExpenseRow({ item, first, onOpen }) {
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.title || 'הוצאה'}
         </div>
-        {item.note && (
-          <div style={{ fontSize: 12, color: 'var(--ink-dim)', marginTop: 2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.note}</div>
-        )}
+        <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>
       </div>
       <div style={{ fontSize: 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
         {fmtMoney(item.amount)}
       </div>
+    </button>
+  );
+}
+
+// ---------- Swipeable stats card (second page of the home widget pager) ----------
+function ExpensesStatsCard({ lists, onClick }) {
+  const { activeList, items } = lists;
+  const categories = (activeList?.groups && activeList.groups.length) ? activeList.groups : DEFAULT_CATEGORIES;
+  const now = new Date();
+  const monthItems = React.useMemo(() => items.filter(it => {
+    const d = expenseDate(it);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }), [items]);
+  const stats = React.useMemo(() => computeStats(monthItems, categories), [monthItems, categories.join('|')]);
+  const top = stats.rows.slice(0, 4);
+
+  return (
+    <button onClick={onClick} className="hero-card" style={{
+      width: '100%', textAlign: 'start', cursor: onClick ? 'pointer' : 'default',
+      color: 'var(--ink)', fontFamily: 'inherit',
+      background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
+      backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      border: '1px solid var(--glass-border)', borderRadius: 28, padding: 22,
+      display: 'flex', flexDirection: 'column', gap: 16, position: 'relative', overflow: 'hidden',
+      boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 4 }}>הוצאות · {MONTH_NAMES_HE[now.getMonth()]}</div>
+          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {fmtMoney(stats.overall)}
+          </div>
+        </div>
+        <div style={{ padding: '6px 12px', borderRadius: 999, background: 'var(--surface-2)', fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+          {monthItems.length} רשומות
+        </div>
+      </div>
+
+      {top.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--ink-dim)', padding: '6px 0' }}>אין הוצאות החודש — הוסף כדי לראות פילוח</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {top.map(r => {
+            const pct = stats.overall > 0 ? Math.round(r.sum / stats.overall * 100) : 0;
+            return (
+              <div key={r.cat}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{r.cat}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(r.sum)} · {pct}%</span>
+                </div>
+                <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width .4s ease' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </button>
   );
 }
@@ -378,8 +475,75 @@ function PrimaryButton({ children, onClick, disabled }) {
 
 function Label({ children }) {
   return (
-    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 9 }}>
-      {children}
+    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 9 }}>{children}</div>
+  );
+}
+
+// App-styled date field — tap to reveal an inline month-grid picker (no native UI).
+function DateField({ value, onChange }) {
+  const [open, setOpen] = React.useState(false);
+  const d = parseISODate(value);
+  const isToday = value === todayISO();
+  return (
+    <div>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'var(--surface-2)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        color: 'var(--ink)', padding: '13px 15px', borderRadius: 14,
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700 }}>
+          <Icon name="calendar" size={16} />
+          {isToday ? 'היום' : fmtDateHeFull(d)}
+        </span>
+        <span style={{ display: 'inline-flex', transition: 'transform .2s ease', transform: open ? 'rotate(180deg)' : 'none', color: 'var(--ink-dim)' }}>
+          <Icon name="chevron-down" size={16} />
+        </span>
+      </button>
+      {open && <MiniCalendar value={value} onPick={(iso) => { onChange(iso); setOpen(false); }} />}
+    </div>
+  );
+}
+
+function MiniCalendar({ value, onPick }) {
+  const sel = parseISODate(value);
+  const [cursor, setCursor] = React.useState(() => new Date(sel.getFullYear(), sel.getMonth(), 1));
+  const cells = React.useMemo(() => {
+    const startDay = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay();
+    const days = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    const arr = [];
+    for (let i = 0; i < startDay; i++) arr.push(null);
+    for (let dd = 1; dd <= days; dd++) arr.push(dd);
+    return arr;
+  }, [cursor]);
+  const today = new Date();
+  const isSel = (dd) => sel.getFullYear() === cursor.getFullYear() && sel.getMonth() === cursor.getMonth() && sel.getDate() === dd;
+  const isToday = (dd) => today.getFullYear() === cursor.getFullYear() && today.getMonth() === cursor.getMonth() && today.getDate() === dd;
+
+  return (
+    <div style={{ background: 'var(--surface-2)', borderRadius: 16, padding: 12, marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-3)"
+          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))} />
+        <div style={{ fontSize: 14, fontWeight: 800 }}>{MONTH_NAMES_HE[cursor.getMonth()]} {cursor.getFullYear()}</div>
+        <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-3)"
+          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 4 }}>
+        {DAY_NAMES_HE.map((n, i) => (
+          <div key={i} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 700, color: 'var(--ink-dim)', padding: '2px 0' }}>{n}</div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
+        {cells.map((dd, i) => dd == null ? <div key={i} /> : (
+          <button key={i} onClick={() => onPick(localISO(new Date(cursor.getFullYear(), cursor.getMonth(), dd)))} style={{
+            aspectRatio: '1 / 1', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            borderRadius: 10, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+            background: isSel(dd) ? 'var(--accent)' : 'transparent',
+            color: isSel(dd) ? 'var(--accent-fg)' : 'var(--ink)',
+            outline: isToday(dd) && !isSel(dd) ? '1.5px solid var(--accent)' : 'none', outlineOffset: -1.5,
+          }}>{dd}</button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -389,34 +553,28 @@ function AddExpenseSheet({ open, onClose, categories, defaultCategory, onAdd }) 
   const [amount, setAmount] = React.useState('');
   const [title, setTitle] = React.useState('');
   const [category, setCategory] = React.useState(defaultCategory || categories[0]);
+  const [date, setDate] = React.useState(todayISO());
   const [note, setNote] = React.useState('');
   const [showNote, setShowNote] = React.useState(false);
   const amountRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!open) return;
-    setAmount(''); setTitle(''); setNote(''); setShowNote(false);
+    setAmount(''); setTitle(''); setNote(''); setShowNote(false); setDate(todayISO());
     setCategory(defaultCategory || categories[0]);
-    const id = setTimeout(() => {
-      try { amountRef.current && amountRef.current.focus({ preventScroll: true }); } catch (e) {}
-    }, 360);
+    const id = setTimeout(() => { try { amountRef.current && amountRef.current.focus({ preventScroll: true }); } catch (e) {} }, 360);
     return () => clearTimeout(id);
   }, [open, defaultCategory]);
 
   const valid = title.trim() && amount !== '' && Number(amount) > 0;
-  const submit = () => {
-    if (!valid) return;
-    onAdd({ title, amount, group: category, note });
-    onClose();
-  };
+  const submit = () => { if (valid) { onAdd({ title, amount, group: category, note, date }); onClose(); } };
 
   return (
-    <Sheet open={open} onClose={onClose} title="הוצאה חדשה" height="80%">
+    <Sheet open={open} onClose={onClose} title="הוצאה חדשה" height="86%">
       <div style={{ padding: '18px 22px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <Label>כמה?</Label>
-          <FieldInput inputRef={amountRef} value={amount} onChange={setAmount}
-            placeholder="₪0" type="number" inputMode="decimal" big onEnter={submit} />
+          <FieldInput inputRef={amountRef} value={amount} onChange={setAmount} placeholder="₪0" type="number" inputMode="decimal" big onEnter={submit} />
         </div>
         <div>
           <Label>על מה?</Label>
@@ -425,6 +583,10 @@ function AddExpenseSheet({ open, onClose, categories, defaultCategory, onAdd }) 
         <div>
           <Label>קטגוריה</Label>
           <CategoryChips categories={categories} value={category} onChange={setCategory} />
+        </div>
+        <div>
+          <Label>תאריך</Label>
+          <DateField value={date} onChange={setDate} />
         </div>
         {showNote ? (
           <div>
@@ -450,6 +612,7 @@ function EditExpenseSheet({ open, onClose, item, categories, onSave, onDelete })
   const [amount, setAmount] = React.useState('');
   const [title, setTitle] = React.useState('');
   const [category, setCategory] = React.useState('');
+  const [date, setDate] = React.useState(todayISO());
   const [note, setNote] = React.useState('');
   const confirm = useConfirm();
 
@@ -458,19 +621,20 @@ function EditExpenseSheet({ open, onClose, item, categories, onSave, onDelete })
       setTitle(item.title || '');
       setAmount(item.amount == null ? '' : String(item.amount));
       setCategory(item.group || categories[0]);
+      setDate(item.date || localISO(expenseDate(item)));
       setNote(item.note || '');
     }
   }, [item]);
 
   const valid = title.trim() && amount !== '' && Number(amount) > 0;
-  const save = () => { if (valid) onSave({ id: item.id, title, amount, group: category, note }); };
+  const save = () => { if (valid) onSave({ id: item.id, title, amount, group: category, note, date }); };
   const del = async () => {
     const ok = await confirm({ title: 'מחיקת הוצאה', message: 'ההוצאה תימחק מהמעקב', confirmLabel: 'מחק' });
     if (ok) onDelete(item.id);
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="עריכת הוצאה" height="84%">
+    <Sheet open={open} onClose={onClose} title="עריכת הוצאה" height="90%">
       <div style={{ padding: '18px 22px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
           <Label>סכום</Label>
@@ -483,6 +647,10 @@ function EditExpenseSheet({ open, onClose, item, categories, onSave, onDelete })
         <div>
           <Label>קטגוריה</Label>
           <CategoryChips categories={categories} value={category} onChange={setCategory} />
+        </div>
+        <div>
+          <Label>תאריך</Label>
+          <DateField value={date} onChange={setDate} />
         </div>
         <div>
           <Label>הערה (אופציונלי)</Label>
@@ -517,18 +685,9 @@ function ManageExpensesSheet({ open, onClose, lists }) {
 
   React.useEffect(() => { if (activeList) setName(activeList.name || ''); }, [activeList, open]);
 
-  const saveName = () => {
-    const n = name.trim();
-    if (activeList && n && n !== activeList.name) ops.renameList(activeListId, n);
-  };
-  const addCat = () => {
-    const g = newCat.trim();
-    if (!g || categories.includes(g)) { setNewCat(''); return; }
-    ops.setGroups(activeListId, [...categories, g]);
-    setNewCat('');
-  };
+  const saveName = () => { const n = name.trim(); if (activeList && n && n !== activeList.name) ops.renameList(activeListId, n); };
+  const addCat = () => { const g = newCat.trim(); if (!g || categories.includes(g)) { setNewCat(''); return; } ops.setGroups(activeListId, [...categories, g]); setNewCat(''); };
   const removeCat = (g) => ops.setGroups(activeListId, categories.filter(x => x !== g));
-
   const copyCode = async () => {
     try { await navigator.clipboard.writeText(activeListId); setCopied(true); setTimeout(() => setCopied(false), 1600); }
     catch { toast('לא ניתן להעתיק — סמן והעתק ידנית', { type: 'error' }); }
@@ -555,10 +714,9 @@ function ManageExpensesSheet({ open, onClose, lists }) {
   return (
     <Sheet open={open} onClose={onClose} title="ניהול הוצאות" height="90%">
       <div style={{ padding: '18px 22px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-
         {allLists.length > 1 && (
           <Section title="מעקבים">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {allLists.map(l => (
                 <Chip key={l.id} active={l.id === activeListId} onClick={() => setActiveListId(l.id)}>
                   {l.name}{(l.members?.length || 1) > 1 ? ' ·👥' : ''}
@@ -578,10 +736,7 @@ function ManageExpensesSheet({ open, onClose, lists }) {
         <Section title="קטגוריות">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
             {categories.map(g => (
-              <div key={g} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'var(--surface-2)', borderRadius: 12, padding: '10px 14px',
-              }}>
+              <div key={g} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-2)', borderRadius: 12, padding: '10px 14px' }}>
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{g}</span>
                 <button onClick={() => removeCat(g)} aria-label="מחק קטגוריה" disabled={categories.length <= 1} style={{
                   background: 'transparent', border: 'none', cursor: categories.length <= 1 ? 'not-allowed' : 'pointer',
@@ -605,8 +760,7 @@ function ManageExpensesSheet({ open, onClose, lists }) {
             שלח את הקוד למי שתרצה לשתף. מי שיזין אותו יראה ויעדכן את ההוצאות יחד איתך.
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 12, padding: '10px 12px' }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, fontFamily: 'monospace',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'ltr' }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'ltr' }}>
               {activeListId || '—'}
             </span>
             <button onClick={copyCode} style={{ ...ghostBtn, width: 'auto', padding: '8px 14px', whiteSpace: 'nowrap' }}>
@@ -673,10 +827,9 @@ function Section({ title, children }) {
 const ghostBtn = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
   padding: '11px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
-  background: 'var(--surface-3)', color: 'var(--ink)', fontFamily: 'inherit',
-  fontWeight: 700, fontSize: 13.5,
+  background: 'var(--surface-3)', color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 13.5,
 };
 
 Object.assign(window, {
-  useLists, ExpenseListSection, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
+  useLists, ExpenseListSection, ExpensesStatsCard, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
 });
