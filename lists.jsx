@@ -236,8 +236,6 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
     </button>
   );
 
-  const barColor = budgetColor(stats);
-
   return (
     <div>
       <SectionHeader
@@ -284,23 +282,7 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
                 </div>
               </div>
 
-              {stats.hasCap ? (
-                <div style={{ marginTop: 11 }}>
-                  <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                    <div style={{ width: `${clamp(stats.pctUsed, 0, 100)}%`, height: '100%', background: barColor,
-                      borderRadius: 999, transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 7, gap: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                      color: stats.overCap ? '#FF5C5C' : 'var(--ink-dim)' }}>
-                      {stats.overCap ? `חריגה ${fmtMoney(-stats.remaining)}` : `נשאר ${fmtMoney(stats.remaining)}`}
-                    </span>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                      תקרה {fmtMoney(stats.cap)}
-                    </span>
-                  </div>
-                </div>
-              ) : (
+              {!stats.hasCap && (
                 <div style={{ marginTop: 9, fontSize: 12, fontWeight: 700, color: 'var(--accent)',
                   display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   הגדר תקציב חודשי <Icon name="chevron-left" size={13} />
@@ -398,40 +380,27 @@ function SegBtn({ active, children, onClick, big }) {
 // One category: a clear heading with its total and a share/ceiling bar.
 // Tap to expand the expenses inside it — keeps the card compact and scannable.
 function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen, big }) {
-  const pct = row.cap > 0 ? row.capPct : row.pct;
   return (
     <div style={{ borderBottom: '1px solid var(--divider)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: big ? '15px 18px 14px' : '12px 16px 11px' }}>
         <button onClick={onToggle} style={{
           flex: 1, minWidth: 0, textAlign: 'start', background: 'transparent', border: 'none',
           cursor: 'pointer', fontFamily: 'inherit', color: 'var(--ink)', padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-              <span style={{ display: 'inline-flex', color: 'var(--ink-dim)', transition: 'transform .2s ease',
-                transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
-                <Icon name="chevron-down" size={15} />
-              </span>
-              <span style={{ fontSize: big ? 18.5 : 16.5, fontWeight: 800, letterSpacing: '-0.01em',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.cat}</span>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)' }}>{row.count}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+            <span style={{ display: 'inline-flex', color: 'var(--ink-dim)', transition: 'transform .2s ease',
+              transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+              <Icon name="chevron-down" size={15} />
             </span>
-            <span style={{ fontSize: big ? 17.5 : 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
-              color: row.overCap ? '#FF5C5C' : 'var(--ink)', whiteSpace: 'nowrap' }}>
-              {fmtMoney(row.sum)}
-            </span>
-          </div>
-          <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-            <div style={{ width: `${clamp(pct, 0, 100)}%`, height: '100%', borderRadius: 999,
-              background: row.overCap ? '#FF5C5C' : 'var(--accent)',
-              transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: row.overCap ? '#FF5C5C' : 'var(--ink-dim)',
-            marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
-            {row.cap > 0
-              ? (row.overCap ? `חריגה מתקרת ${fmtMoney(row.cap)}` : `${fmtMoney(row.cap - row.sum)} נשאר מתוך ${fmtMoney(row.cap)}`)
-              : `${row.pct}% מההוצאות`}
-          </div>
+            <span style={{ fontSize: big ? 18.5 : 16.5, fontWeight: 800, letterSpacing: '-0.01em',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.cat}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-dim)' }}>{row.count}</span>
+          </span>
+          <span style={{ fontSize: big ? 17.5 : 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+            color: row.overCap ? '#FF5C5C' : 'var(--ink)', whiteSpace: 'nowrap' }}>
+            {fmtMoney(row.sum)}
+          </span>
         </button>
         {onAdd && (
           <button onClick={onAdd} aria-label={`הוסף ל${row.cat}`} style={{

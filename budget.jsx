@@ -195,6 +195,36 @@ function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings, big }) {
         </div>
       </div>
       {big && <div style={{ marginTop: 16 }}><PaceChips stats={stats} color={color} big /></div>}
+      {big && stats.catRows.length > 0 && (
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--divider)' }}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-dim)', letterSpacing: '.05em',
+            textTransform: 'uppercase', marginBottom: 12 }}>
+            לפי קטגוריה
+          </div>
+          {stats.catRows.slice(0, 4).map(r => (
+            <div key={r.cat} style={{ marginBottom: 11 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.cat}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                  color: r.overCap ? '#FF5C5C' : 'var(--ink-dim)' }}>
+                  {r.cap > 0 ? `${fmtMoney(r.sum)} / ${fmtMoney(r.cap)}` : `${fmtMoney(r.sum)} · ${r.pct}%`}
+                </span>
+              </div>
+              <div style={{ height: 5, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                <div style={{ width: `${clamp(r.cap > 0 ? r.capPct : r.pct, 0, 100)}%`, height: '100%', borderRadius: 999,
+                  background: r.overCap ? '#FF5C5C' : 'var(--accent)',
+                  transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            {stats.catRows.length > 4 ? `ועוד ${stats.catRows.length - 4} · ` : ''}לכל הסטטיסטיקות
+            <Icon name="chevron-left" size={13} />
+          </div>
+        </div>
+      )}
     </button>
   );
 }
