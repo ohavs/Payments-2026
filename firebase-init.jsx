@@ -88,6 +88,13 @@ const DEFAULT_SETTINGS = {
   theme: 'light',
   language: 'he',
   defaultCurrency: '₪',
+  // Budget tool: monthly income + a spending ceiling for tracked expenses.
+  // includeSubsInBudget counts recurring payments' monthly equivalent as
+  // committed spend, so the ceiling reflects true monthly outflow.
+  monthlyIncome: 0,
+  monthlyCap: 0,
+  includeSubsInBudget: true,
+  categoryCaps: {},
 };
 
 function useFirebaseSettings(uid, fallbackName) {
