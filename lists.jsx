@@ -3,10 +3,13 @@
 // across accounts. Expenses live in an items subcollection.
 //
 // Schema:
-//   lists/{id}            → { name, ownerUid, members[], memberInfo{}, groups[](=categories), createdAt }
+//   lists/{id}            → { name, ownerUid, members[], memberInfo{}, groups[](=categories),
+//                             invitedEmails[], createdAt }
 //   lists/{id}/items/{id} → { title, group(=category), amount, note, date(YYYY-MM-DD), createdAt }
 //
-// Sharing: the list id itself is the unguessable invite code (see firestore.rules).
+// Sharing: invite another Google account by its email (invitedEmails) — the
+// invitee sees the invitation in-app and accepts it themselves. The list id also
+// works as an unguessable invite code. Both are enforced in firestore.rules.
 
 const DEFAULT_CATEGORIES = ['קניות', 'ביטוחים', 'אוכל בחוץ', 'שונות'];
 const MONTH_NAMES_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -52,7 +55,9 @@ function useLists(uid, user) {
   const [loading, setLoading] = React.useState(true);
   const [activeListId, setActiveListId] = React.useState(null);
   const [items, setItems] = React.useState([]);
+  const [invites, setInvites] = React.useState([]);
   const seededRef = React.useRef(false);
+  const myEmail = (user?.email || '').trim().toLowerCase();
 
   React.useEffect(() => {
     if (!uid || !window.fbDb) { setLists([]); setLoading(false); return; }
@@ -68,6 +73,20 @@ function useLists(uid, user) {
     return () => unsub();
   }, [uid]);
 
+  // Trackers someone invited this Google account to. Readable thanks to the
+  // invitedEmails rule, so an invitation shows up without any server code.
+  React.useEffect(() => {
+    if (!uid || !myEmail || !window.fbDb) { setInvites([]); return; }
+    const unsub = fbDb.collection('lists')
+      .where('invitedEmails', 'array-contains', myEmail)
+      .onSnapshot((snap) => {
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .filter(l => !(l.members || []).includes(uid));
+        setInvites(rows);
+      }, (err) => console.error('invites subscribe error', err));
+    return () => unsub();
+  }, [uid, myEmail]);
+
   React.useEffect(() => {
     if (!uid || loading || seededRef.current) return;
     if (lists.length === 0) {
@@ -78,6 +97,7 @@ function useLists(uid, user) {
         members: [uid],
         memberInfo: { [uid]: { name: user?.displayName || '', email: user?.email || '' } },
         groups: DEFAULT_CATEGORIES.slice(),
+        invitedEmails: [],
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       }).catch((e) => { console.error('seed tracker', e); seededRef.current = false; });
     }
@@ -112,7 +132,7 @@ function useLists(uid, user) {
       createList: async (name) => {
         const ref = await col().add({
           name: name || 'מעקב חדש', ownerUid: uid, members: [uid],
-          memberInfo: { [uid]: meInfo() }, groups: DEFAULT_CATEGORIES.slice(),
+          memberInfo: { [uid]: meInfo() }, groups: DEFAULT_CATEGORIES.slice(), invitedEmails: [],
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
         setActiveListId(ref.id);
@@ -144,6 +164,33 @@ function useLists(uid, user) {
         return col().doc(id).collection('items').doc(itemId).set(data, { merge: true });
       },
       removeItem: (id, itemId) => col().doc(id).collection('items').doc(itemId).delete(),
+      // Invite another Google account by email. They see the invitation the
+      // next time they open the app and can accept it themselves.
+      inviteEmail: async (id, email) => {
+        const e = (email || '').trim().toLowerCase();
+        if (!e) return { ok: false, reason: 'empty' };
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: false, reason: 'invalid' };
+        if (e === (user?.email || '').trim().toLowerCase()) return { ok: false, reason: 'self' };
+        try {
+          await col().doc(id).update({ invitedEmails: firebase.firestore.FieldValue.arrayUnion(e) });
+          return { ok: true, email: e };
+        } catch (err) { console.error('invite error', err); return { ok: false, reason: 'failed' }; }
+      },
+      revokeInvite: (id, email) => col().doc(id).update({
+        invitedEmails: firebase.firestore.FieldValue.arrayRemove((email || '').trim().toLowerCase()),
+      }),
+      acceptInvite: async (id) => {
+        const e = (user?.email || '').trim().toLowerCase();
+        await col().doc(id).update({
+          members: firebase.firestore.FieldValue.arrayUnion(uid),
+          [`memberInfo.${uid}`]: meInfo(),
+          invitedEmails: firebase.firestore.FieldValue.arrayRemove(e),
+        });
+        setActiveListId(id);
+      },
+      declineInvite: (id) => col().doc(id).update({
+        invitedEmails: firebase.firestore.FieldValue.arrayRemove((user?.email || '').trim().toLowerCase()),
+      }),
       joinByCode: async (code) => {
         const clean = (code || '').trim();
         if (!clean) return { ok: false, reason: 'empty' };
@@ -165,7 +212,7 @@ function useLists(uid, user) {
     };
   }, [uid, user]);
 
-  return { loading, lists, activeList, activeListId, setActiveListId, items, ops };
+  return { loading, lists, activeList, activeListId, setActiveListId, items, invites, ops };
 }
 // ---------- Home section ----------
 // Budget-aware expenses card: month navigator, headline total with the ceiling
@@ -327,6 +374,65 @@ function SegBtn({ active, children, onClick, big }) {
 
 // One category: a clear heading with its total and a share/ceiling bar.
 // Tap to expand the expenses inside it — keeps the card compact and scannable.
+// Shown to a Google account that was invited to someone else's tracker.
+function PendingInvitesCard({ lists }) {
+  const { invites, ops } = lists;
+  const toast = useToast();
+  if (!invites || !invites.length) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+      {invites.map(inv => {
+        const owner = (inv.memberInfo || {})[inv.ownerUid] || {};
+        const who = owner.name || owner.email || 'משתמש';
+        return (
+          <div key={inv.id} style={{
+            background: 'var(--surface-1)', borderRadius: 20, padding: '16px 18px',
+            border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 13 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12, background: 'var(--accent)',
+                color: 'var(--accent-fg)', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name="user" size={19} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.01em',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  הוזמנת ל״{inv.name || 'מעקב הוצאות'}״
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  על ידי {who}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={async () => {
+                try { await ops.acceptInvite(inv.id); toast('הצטרפת למעקב', { type: 'success' }); }
+                catch (e) { console.error(e); toast('ההצטרפות נכשלה', { type: 'error' }); }
+              }} style={{
+                flex: 1, padding: '11px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: 'var(--accent)', color: 'var(--accent-fg)',
+                fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
+              }}>הצטרף</button>
+              <button onClick={async () => {
+                try { await ops.declineInvite(inv.id); toast('ההזמנה נדחתה', { type: 'info' }); }
+                catch (e) { console.error(e); }
+              }} style={{
+                padding: '11px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: 'var(--surface-2)', color: 'var(--ink-dim)',
+                fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
+              }}>לא עכשיו</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen, big }) {
   return (
     <div style={{ borderBottom: '1px solid var(--divider)' }}>
@@ -645,6 +751,8 @@ function ManageExpensesSheet({ open, onClose, lists }) {
   const { activeList, activeListId, lists: allLists, setActiveListId, ops } = lists;
   const [name, setName] = React.useState('');
   const [newCat, setNewCat] = React.useState('');
+  const [inviteMail, setInviteMail] = React.useState('');
+  const [showCode, setShowCode] = React.useState(false);
   const [joinCode, setJoinCode] = React.useState('');
   const [copied, setCopied] = React.useState(false);
   const toast = useToast();
@@ -662,6 +770,14 @@ function ManageExpensesSheet({ open, onClose, lists }) {
   const copyCode = async () => {
     try { await navigator.clipboard.writeText(activeListId); setCopied(true); setTimeout(() => setCopied(false), 1600); }
     catch { toast('לא ניתן להעתיק — סמן והעתק ידנית', { type: 'error' }); }
+  };
+  const pendingInvites = activeList?.invitedEmails || [];
+  const invite = async () => {
+    const res = await ops.inviteEmail(activeListId, inviteMail);
+    if (res.ok) { setInviteMail(''); toast(`הזמנה נשלחה ל${res.email}`, { type: 'success' }); }
+    else if (res.reason === 'invalid') toast('כתובת מייל לא תקינה', { type: 'error' });
+    else if (res.reason === 'self') toast('זו הכתובת שלך', { type: 'error' });
+    else if (res.reason === 'failed') toast('ההזמנה נכשלה', { type: 'error' });
   };
   const join = async () => {
     const res = await ops.joinByCode(joinCode);
@@ -726,25 +842,70 @@ function ManageExpensesSheet({ open, onClose, lists }) {
           </div>
         </Section>
 
-        <Section title="שיתוף המעקב">
+        <Section title="שיתוף עם חשבון גוגל">
           <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginBottom: 10, lineHeight: 1.5 }}>
-            שלח את הקוד למי שתרצה לשתף. מי שיזין אותו יראה ויעדכן את ההוצאות יחד איתך.
+            הזן את כתובת ה-Gmail שהוא מתחבר איתה. ההזמנה תופיע לו באפליקציה,
+            ואחרי שיאשר תוכלו לנהל את ההוצאות יחד.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 12, padding: '10px 12px' }}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'ltr' }}>
-              {activeListId || '—'}
-            </span>
-            <button onClick={copyCode} style={{ ...ghostBtn, width: 'auto', padding: '8px 14px', whiteSpace: 'nowrap' }}>
-              {copied ? 'הועתק ✓' : 'העתק'}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <FieldInput value={inviteMail} onChange={setInviteMail} placeholder="name@gmail.com"
+              type="email" dir="ltr" onEnter={invite} />
+            <button onClick={invite} style={{ ...ghostBtn, width: 'auto', padding: '0 16px', whiteSpace: 'nowrap' }}>
+              הזמן
             </button>
           </div>
-        </Section>
 
-        <Section title="הצטרפות למעקב משותף">
-          <div style={{ display: 'flex', gap: 8 }}>
-            <FieldInput value={joinCode} onChange={setJoinCode} placeholder="הדבק כאן קוד" dir="ltr" onEnter={join} />
-            <button onClick={join} style={{ ...ghostBtn, width: 'auto', padding: '0 16px', whiteSpace: 'nowrap' }}>הצטרף</button>
-          </div>
+          {(pendingInvites.length > 0) && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-dim)', marginBottom: 8 }}>
+                ממתינות לאישור
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pendingInvites.map(e => (
+                  <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'var(--surface-2)', borderRadius: 12, padding: '9px 13px' }}>
+                    <Icon name="bell" size={15} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, direction: 'ltr',
+                      textAlign: 'start', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e}</span>
+                    <button onClick={() => ops.revokeInvite(activeListId, e)} aria-label="בטל הזמנה" style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer', color: '#FF5C5C', padding: 4,
+                    }}>
+                      <Icon name="close" size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Code sharing stays available for accounts without email (anonymous). */}
+          <button onClick={() => setShowCode(v => !v)} style={{
+            marginTop: 12, background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--ink-dim)', fontFamily: 'inherit', fontWeight: 700, fontSize: 12.5,
+            display: 'inline-flex', alignItems: 'center', gap: 5, padding: 0,
+          }}>
+            {showCode ? 'הסתר' : 'או שיתוף באמצעות קוד'}
+            <span style={{ display: 'inline-flex', transition: 'transform .2s ease',
+              transform: showCode ? 'rotate(180deg)' : 'none' }}>
+              <Icon name="chevron-down" size={13} />
+            </span>
+          </button>
+          {showCode && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', borderRadius: 12, padding: '10px 12px' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', direction: 'ltr' }}>
+                  {activeListId || '—'}
+                </span>
+                <button onClick={copyCode} style={{ ...ghostBtn, width: 'auto', padding: '8px 14px', whiteSpace: 'nowrap' }}>
+                  {copied ? 'הועתק ✓' : 'העתק'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <FieldInput value={joinCode} onChange={setJoinCode} placeholder="או הדבק קוד להצטרפות" dir="ltr" onEnter={join} />
+                <button onClick={join} style={{ ...ghostBtn, width: 'auto', padding: '0 16px', whiteSpace: 'nowrap' }}>הצטרף</button>
+              </div>
+            </div>
+          )}
         </Section>
 
         {members.length > 0 && (
@@ -802,6 +963,6 @@ const ghostBtn = {
 };
 
 Object.assign(window, {
-  useLists, ExpenseListSection, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
+  useLists, ExpenseListSection, PendingInvitesCard, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
   expenseDate, localISO, todayISO, MONTH_NAMES_HE, DEFAULT_CATEGORIES,
 });

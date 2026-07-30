@@ -263,6 +263,9 @@ function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSet
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         padding: '0 18px 140px', WebkitOverflowScrolling: 'touch',
       }}>
+        {/* Invitations to other people's trackers, if any */}
+        <PendingInvitesCard lists={lists} />
+
         <div style={{ marginBottom: 16 }}>
           <BudgetHeroCard stats={budgetStats} big
             monthLabel={`${MONTH_NAMES_HE[view.m]} ${view.y}`}
