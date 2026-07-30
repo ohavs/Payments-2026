@@ -167,62 +167,59 @@ function useLists(uid, user) {
 
   return { loading, lists, activeList, activeListId, setActiveListId, items, ops };
 }
-
-// Compute per-category + overall totals for a set of expenses.
-function computeStats(items, categories) {
-  const totals = {}; categories.forEach(c => { totals[c] = 0; });
-  let overall = 0; let extra = 0;
-  items.forEach(it => {
-    const amt = Number(it.amount) || 0;
-    overall += amt;
-    if (it.group && totals[it.group] != null) totals[it.group] += amt;
-    else extra += amt;
-  });
-  const rows = categories.map(c => ({ cat: c, sum: totals[c] })).filter(r => r.sum > 0);
-  if (extra > 0) rows.push({ cat: 'ללא קטגוריה', sum: extra });
-  rows.sort((a, b) => b.sum - a.sum);
-  return { overall, rows };
-}
-
 // ---------- Home section ----------
-function ExpenseListSection({ lists }) {
+// Budget-aware expenses card: month navigator, headline total with the ceiling
+// progress, and two ways to read the data — by category (accordion) or by date.
+function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenBudget }) {
   const { loading, activeList, activeListId, items, ops } = lists;
   const [collapsed, setCollapsed] = useStickyState('home.expensesCollapsed', false);
+  const [byDate, setByDate] = useStickyState('home.expensesByDate', false);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editItem, setEditItem] = React.useState(null);
   const [manageOpen, setManageOpen] = React.useState(false);
   const [addCat, setAddCat] = React.useState(null);
+  const [openCat, setOpenCat] = React.useState(null);
   const [view, setView] = React.useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const toast = useToast();
 
   const categories = (activeList?.groups && activeList.groups.length) ? activeList.groups : DEFAULT_CATEGORIES;
-  const shared = (activeList?.members?.length || 1) > 1;
 
-  const monthItems = React.useMemo(() => items.filter(it => {
-    const d = expenseDate(it);
-    return d.getFullYear() === view.y && d.getMonth() === view.m;
-  }), [items, view.y, view.m]);
+  const stats = React.useMemo(() => computeBudgetStats({
+    items, y: view.y, m: view.m,
+    income: Number(settings?.monthlyIncome) || 0,
+    cap: Number(settings?.monthlyCap) || 0,
+    subsMonthly, includeSubs: settings?.includeSubsInBudget !== false,
+    categories, categoryCaps: settings?.categoryCaps || {},
+  }), [items, view.y, view.m, settings, subsMonthly, categories.join('|')]);
 
-  const total = monthItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  const shiftMonth = (delta) => {
+    const d = new Date(view.y, view.m + delta, 1);
+    setView({ y: d.getFullYear(), m: d.getMonth() });
+    setOpenCat(null);
+  };
 
-  const buckets = React.useMemo(() => {
-    const map = {}; const totals = {};
-    categories.forEach(c => { map[c] = []; totals[c] = 0; });
-    const extra = []; let extraTotal = 0;
-    monthItems.forEach(it => {
-      const amt = Number(it.amount) || 0;
-      if (it.group && map[it.group]) { map[it.group].push(it); totals[it.group] += amt; }
-      else { extra.push(it); extraTotal += amt; }
+  // Expenses of the viewed month, grouped by day (newest first).
+  const dayGroups = React.useMemo(() => {
+    const map = new Map();
+    stats.monthItems.forEach(it => {
+      const key = localISO(expenseDate(it));
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(it);
     });
-    return { map, totals, extra, extraTotal };
-  }, [monthItems, categories.join('|')]);
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [stats.monthItems]);
 
-  const shiftMonth = (delta) => setView(v => {
-    const d = new Date(v.y, v.m + delta, 1);
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-  const now = new Date();
-  const isCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
+  // Titles used recently — offered as one-tap fill in the quick-add sheet.
+  const recentTitles = React.useMemo(() => {
+    const seen = []; 
+    items.forEach(it => {
+      const t = (it.title || '').trim();
+      if (t && !seen.includes(t)) seen.push(t);
+    });
+    return seen.slice(0, 6);
+  }, [items]);
+
+  const openAdd = (cat) => { setAddCat(cat || categories[0]); setAddOpen(true); };
 
   const manageBtn = (
     <button onClick={() => setManageOpen(true)} aria-label="ניהול הוצאות" style={{
@@ -234,16 +231,13 @@ function ExpenseListSection({ lists }) {
     </button>
   );
 
-  const openAdd = (cat) => { setAddCat(cat || categories[0]); setAddOpen(true); };
-
-  const orderedCats = categories.filter(c => (buckets.map[c] || []).length);
-  const showExtra = buckets.extra.length > 0;
+  const barColor = budgetColor(stats);
 
   return (
     <div>
       <SectionHeader
         title="הוצאות"
-        count={loading ? null : monthItems.length}
+        count={loading ? null : stats.count}
         collapsible collapsed={collapsed}
         onToggle={() => setCollapsed(v => !v)}
         onAdd={() => openAdd()}
@@ -258,53 +252,120 @@ function ExpenseListSection({ lists }) {
           </div>
         ) : (
           <div style={{ background: 'var(--surface-1)', borderRadius: 22, overflow: 'hidden' }}>
-            {/* Month navigator + total */}
-            <div style={{ padding: '14px 16px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 }}>
-                <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-2)" onClick={() => shiftMonth(-1)} />
-                <div style={{ minWidth: 128, textAlign: 'center', fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.01em' }}>
-                  {MONTH_NAMES_HE[view.m]} {view.y}
-                </div>
-                <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-2)"
-                  onClick={() => shiftMonth(1)} style={{ opacity: isCurrentMonth ? .4 : 1 }} />
+            {/* Month navigator */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 12px 0' }}>
+              <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-2)"
+                onClick={() => shiftMonth(-1)} ariaLabel="חודש קודם" />
+              <div style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.01em' }}>
+                {MONTH_NAMES_HE[view.m]} {view.y}
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
-                  סה״כ{shared ? ` · משותף · ${activeList.members.length}` : ''}
-                </div>
-                <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtMoney(total)}
-                </div>
-              </div>
+              <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-2)"
+                onClick={() => shiftMonth(1)} ariaLabel="חודש הבא" />
             </div>
 
-            {monthItems.length === 0 ? (
-              <div style={{ padding: '22px 18px 26px', textAlign: 'center', color: 'var(--ink-dim)', borderTop: '1px solid var(--divider)' }}>
-                <div style={{ fontSize: 14, marginBottom: 12 }}>אין הוצאות {isCurrentMonth ? 'החודש' : 'בחודש זה'}</div>
+            {/* Headline total + ceiling progress */}
+            <button onClick={onOpenBudget} style={{
+              width: '100%', textAlign: 'start', background: 'transparent', border: 'none',
+              cursor: onOpenBudget ? 'pointer' : 'default', fontFamily: 'inherit', color: 'var(--ink)',
+              padding: '12px 16px 15px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
+                  סה״כ הוצאות
+                  {stats.committed > 0 ? ` + מנויים ${fmtMoney(stats.committed)}` : ''}
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtMoney(stats.used)}
+                </div>
+              </div>
+
+              {stats.hasCap ? (
+                <div style={{ marginTop: 11 }}>
+                  <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                    <div style={{ width: `${clamp(stats.pctUsed, 0, 100)}%`, height: '100%', background: barColor,
+                      borderRadius: 999, transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 7, gap: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                      color: stats.overCap ? '#FF5C5C' : 'var(--ink-dim)' }}>
+                      {stats.overCap ? `חריגה ${fmtMoney(-stats.remaining)}` : `נשאר ${fmtMoney(stats.remaining)}`}
+                    </span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                      תקרה {fmtMoney(stats.cap)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: 9, fontSize: 12, fontWeight: 700, color: 'var(--accent)',
+                  display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  הגדר תקציב חודשי <Icon name="chevron-left" size={13} />
+                </div>
+              )}
+            </button>
+
+            {/* View switch */}
+            <div style={{ display: 'flex', gap: 4, padding: '0 12px 12px' }}>
+              <SegBtn active={!byDate} onClick={() => setByDate(false)}>קטגוריות</SegBtn>
+              <SegBtn active={byDate} onClick={() => setByDate(true)}>תאריכים</SegBtn>
+            </div>
+
+            {stats.count === 0 ? (
+              <div style={{ padding: '20px 18px 26px', textAlign: 'center', color: 'var(--ink-dim)', borderTop: '1px solid var(--divider)' }}>
+                <div style={{ fontSize: 14, marginBottom: 12 }}>
+                  אין הוצאות {stats.isCurrent ? 'החודש' : 'בחודש זה'}
+                </div>
                 <button onClick={() => openAdd()} style={{
                   background: 'var(--accent)', color: 'var(--accent-fg)', border: 'none',
                   cursor: 'pointer', fontFamily: 'inherit', padding: '9px 16px',
                   borderRadius: 999, fontWeight: 700, fontSize: 13.5,
                 }}>הוסף הוצאה</button>
               </div>
+            ) : byDate ? (
+              <div style={{ borderTop: '1px solid var(--divider)' }}>
+                {dayGroups.map(([iso, list]) => {
+                  const sum = list.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+                  const d = parseISODate(iso);
+                  const isToday = iso === todayISO();
+                  return (
+                    <div key={iso}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 16px 4px', background: 'var(--surface-1)' }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: isToday ? 'var(--ink)' : 'var(--ink-dim)' }}>
+                          {isToday ? 'היום' : `${DAY_NAMES_HE[d.getDay()]}׳ · ${fmtDateHe(d)}`}
+                        </span>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                          {fmtMoney(sum)}
+                        </span>
+                      </div>
+                      <div style={{ paddingBottom: 4 }}>
+                        {list.map(it => (
+                          <ExpenseRow key={it.id} item={it} showCategory onOpen={() => setEditItem(it)} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <>
-                {orderedCats.map((c, i) => (
-                  <CategoryBlock key={c} label={c} sum={buckets.totals[c]} items={buckets.map[c]} first={i === 0}
-                    onAdd={() => openAdd(c)} onOpen={(it) => setEditItem(it)} />
+              <div style={{ borderTop: '1px solid var(--divider)' }}>
+                {stats.catRows.map(r => (
+                  <CategoryBlock key={r.cat} row={r} spent={stats.spent}
+                    items={(stats.monthItems || []).filter(it => (r.cat === 'ללא קטגוריה'
+                      ? !it.group || !categories.includes(it.group)
+                      : it.group === r.cat))}
+                    expanded={openCat === r.cat}
+                    onToggle={() => setOpenCat(prev => prev === r.cat ? null : r.cat)}
+                    onAdd={r.cat === 'ללא קטגוריה' ? null : () => openAdd(r.cat)}
+                    onOpen={(it) => setEditItem(it)} />
                 ))}
-                {showExtra && (
-                  <CategoryBlock label="ללא קטגוריה" sum={buckets.extraTotal} items={buckets.extra}
-                    first={orderedCats.length === 0} onOpen={(it) => setEditItem(it)} />
-                )}
-              </>
+              </div>
             )}
           </div>
         )
       )}
 
       <AddExpenseSheet open={addOpen} onClose={() => setAddOpen(false)}
-        categories={categories} defaultCategory={addCat}
+        categories={categories} defaultCategory={addCat} recentTitles={recentTitles}
         onAdd={(item) => { ops.addItem(activeListId, item); toast('ההוצאה נוספה', { type: 'success' }); }} />
 
       <EditExpenseSheet open={!!editItem} onClose={() => setEditItem(null)}
@@ -317,119 +378,99 @@ function ExpenseListSection({ lists }) {
   );
 }
 
-// A category: a clear, larger header + its expenses grouped beneath it.
-// Categories are separated by a divider; rows inside a category are not, so the
-// grouping reads correctly (N expenses look like N rows under one heading).
-function CategoryBlock({ label, sum, items, onAdd, onOpen, first }) {
+function SegBtn({ active, children, onClick }) {
   return (
-    <div style={{ borderTop: first ? '1px solid var(--divider)' : '6px solid var(--surface-2)' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '13px 16px 7px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.01em' }}>{label}</span>
-          {onAdd && (
-            <button onClick={onAdd} aria-label={`הוסף ל${label}`} style={{
-              width: 22, height: 22, borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: 'var(--surface-2)', color: 'var(--ink-dim)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon name="plus" size={13} strokeWidth={2.8} />
-            </button>
-          )}
-        </div>
-        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>
-          {fmtMoney(sum)}
-        </span>
+    <button onClick={onClick} style={{
+      flex: 1, padding: '9px 0', borderRadius: 11, border: 'none', cursor: 'pointer',
+      background: active ? 'var(--surface-3)' : 'var(--surface-2)',
+      color: active ? 'var(--ink)' : 'var(--ink-dim)',
+      fontFamily: 'inherit', fontWeight: 800, fontSize: 12.5,
+      transition: 'background .15s ease, color .15s ease',
+    }}>{children}</button>
+  );
+}
+
+// One category: a clear heading with its total and a share/ceiling bar.
+// Tap to expand the expenses inside it — keeps the card compact and scannable.
+function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen }) {
+  const pct = row.cap > 0 ? row.capPct : row.pct;
+  return (
+    <div style={{ borderBottom: '1px solid var(--divider)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 11px' }}>
+        <button onClick={onToggle} style={{
+          flex: 1, minWidth: 0, textAlign: 'start', background: 'transparent', border: 'none',
+          cursor: 'pointer', fontFamily: 'inherit', color: 'var(--ink)', padding: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span style={{ display: 'inline-flex', color: 'var(--ink-dim)', transition: 'transform .2s ease',
+                transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+                <Icon name="chevron-down" size={15} />
+              </span>
+              <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.01em',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.cat}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)' }}>{row.count}</span>
+            </span>
+            <span style={{ fontSize: 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+              color: row.overCap ? '#FF5C5C' : 'var(--ink)', whiteSpace: 'nowrap' }}>
+              {fmtMoney(row.sum)}
+            </span>
+          </div>
+          <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+            <div style={{ width: `${clamp(pct, 0, 100)}%`, height: '100%', borderRadius: 999,
+              background: row.overCap ? '#FF5C5C' : 'var(--accent)',
+              transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: row.overCap ? '#FF5C5C' : 'var(--ink-dim)',
+            marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>
+            {row.cap > 0
+              ? (row.overCap ? `חריגה מתקרת ${fmtMoney(row.cap)}` : `${fmtMoney(row.cap - row.sum)} נשאר מתוך ${fmtMoney(row.cap)}`)
+              : `${row.pct}% מההוצאות`}
+          </div>
+        </button>
+        {onAdd && (
+          <button onClick={onAdd} aria-label={`הוסף ל${row.cat}`} style={{
+            width: 26, height: 26, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'var(--surface-2)', color: 'var(--ink-dim)', flexShrink: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="plus" size={14} strokeWidth={2.8} />
+          </button>
+        )}
       </div>
-      <div style={{ paddingBottom: 6 }}>
-        {items.map((it) => (
-          <ExpenseRow key={it.id} item={it} onOpen={() => onOpen(it)} />
-        ))}
+      <div className="stack-expand-area" data-open={expanded ? 'true' : 'false'}>
+        <div className="stack-expand-wrap">
+          <div style={{ paddingBottom: 6 }}>
+            {items.map(it => (
+              <ExpenseRow key={it.id} item={it} onOpen={() => onOpen(it)} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function ExpenseRow({ item, onOpen }) {
+function ExpenseRow({ item, onOpen, showCategory }) {
   const d = expenseDate(item);
-  const meta = [fmtDateHe(d), item.note].filter(Boolean).join(' · ');
+  const meta = [showCategory ? (item.group || 'ללא קטגוריה') : fmtDateHe(d), item.note].filter(Boolean).join(' · ');
   return (
     <button onClick={onOpen} style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px',
+      width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px 7px 34px',
       background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
       color: 'var(--ink)', textAlign: 'start',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+        <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.title || 'הוצאה'}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 1,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>
       </div>
-      <div style={{ fontSize: 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
         {fmtMoney(item.amount)}
       </div>
-    </button>
-  );
-}
-
-// ---------- Swipeable stats card (second page of the home widget pager) ----------
-function ExpensesStatsCard({ lists, onClick }) {
-  const { activeList, items } = lists;
-  const categories = (activeList?.groups && activeList.groups.length) ? activeList.groups : DEFAULT_CATEGORIES;
-  const now = new Date();
-  const monthItems = React.useMemo(() => items.filter(it => {
-    const d = expenseDate(it);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  }), [items]);
-  const stats = React.useMemo(() => computeStats(monthItems, categories), [monthItems, categories.join('|')]);
-  const top = stats.rows.slice(0, 4);
-
-  return (
-    <button onClick={onClick} className="hero-card" style={{
-      width: '100%', textAlign: 'start', cursor: onClick ? 'pointer' : 'default',
-      color: 'var(--ink)', fontFamily: 'inherit',
-      background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
-      backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-      border: '1px solid var(--glass-border)', borderRadius: 28, padding: 22,
-      display: 'flex', flexDirection: 'column', gap: 16, position: 'relative', overflow: 'hidden',
-      boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 4 }}>הוצאות · {MONTH_NAMES_HE[now.getMonth()]}</div>
-          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-            {fmtMoney(stats.overall)}
-          </div>
-        </div>
-        <div style={{ padding: '6px 12px', borderRadius: 999, background: 'var(--surface-2)', fontSize: 12, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-          {monthItems.length} רשומות
-        </div>
-      </div>
-
-      {top.length === 0 ? (
-        <div style={{ fontSize: 13, color: 'var(--ink-dim)', padding: '6px 0' }}>אין הוצאות החודש — הוסף כדי לראות פילוח</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {top.map(r => {
-            const pct = stats.overall > 0 ? Math.round(r.sum / stats.overall * 100) : 0;
-            return (
-              <div key={r.cat}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 700 }}>{r.cat}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(r.sum)} · {pct}%</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                  <div style={{ width: `${pct}%`, height: '100%', background: 'var(--accent)', borderRadius: 999, transition: 'width .4s ease' }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </button>
   );
 }
@@ -549,7 +590,7 @@ function MiniCalendar({ value, onPick }) {
 }
 
 // ---------- Quick add / edit expense ----------
-function AddExpenseSheet({ open, onClose, categories, defaultCategory, onAdd }) {
+function AddExpenseSheet({ open, onClose, categories, defaultCategory, recentTitles = [], onAdd }) {
   const [amount, setAmount] = React.useState('');
   const [title, setTitle] = React.useState('');
   const [category, setCategory] = React.useState(defaultCategory || categories[0]);
@@ -579,6 +620,13 @@ function AddExpenseSheet({ open, onClose, categories, defaultCategory, onAdd }) 
         <div>
           <Label>על מה?</Label>
           <FieldInput value={title} onChange={setTitle} placeholder="למשל: סופר, דלק, מסעדה..." onEnter={submit} />
+          {recentTitles.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
+              {recentTitles.map(t => (
+                <Chip key={t} onClick={() => setTitle(t)} style={{ padding: '6px 11px', fontSize: 12 }}>{t}</Chip>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <Label>קטגוריה</Label>
@@ -831,5 +879,6 @@ const ghostBtn = {
 };
 
 Object.assign(window, {
-  useLists, ExpenseListSection, ExpensesStatsCard, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
+  useLists, ExpenseListSection, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
+  expenseDate, localISO, todayISO, MONTH_NAMES_HE, DEFAULT_CATEGORIES,
 });

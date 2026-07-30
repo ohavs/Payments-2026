@@ -214,14 +214,38 @@ function HighlightRow({ icon, label, value }) {
 // ---------- HOME ----------
 // Layout: header + compact stats card pinned at top, stacked card list fills the rest
 // and scrolls INTERNALLY (the page itself does NOT scroll).
-function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
+function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings, setSettings }) {
   const [statsDetailOpen, setStatsDetailOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [budgetSettingsOpen, setBudgetSettingsOpen] = useState(false);
   // Collapse state for each home section — persisted per device so the choice
   // survives reloads. Tap a section title to fold/unfold it.
   const [paymentsCollapsed, setPaymentsCollapsed] = usePersistentFlag('home.paymentsCollapsed', false);
   const fx = useExchangeRates();
   const currency = settings.defaultCurrency || '₪';
   const lists = useLists(user?.uid, user);
+
+  // Budget for the *current* month — the widget card and its detail sheet always
+  // report "now", independent of the month being browsed in the expenses list.
+  const subsMonthly = useSubsMonthly(payments, currency);
+  const budgetCategories = (lists.activeList?.groups && lists.activeList.groups.length)
+    ? lists.activeList.groups : DEFAULT_CATEGORIES;
+  const now = new Date();
+  const budgetArgs = {
+    items: lists.items,
+    income: Number(settings.monthlyIncome) || 0,
+    cap: Number(settings.monthlyCap) || 0,
+    subsMonthly, includeSubs: settings.includeSubsInBudget !== false,
+    categories: budgetCategories, categoryCaps: settings.categoryCaps || {},
+  };
+  const budgetStats = useMemo(
+    () => computeBudgetStats({ ...budgetArgs, y: now.getFullYear(), m: now.getMonth() }),
+    [lists.items, settings, subsMonthly, budgetCategories.join('|')]
+  );
+  const prevBudgetStats = useMemo(() => {
+    const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return computeBudgetStats({ ...budgetArgs, y: p.getFullYear(), m: p.getMonth() });
+  }, [lists.items, settings, subsMonthly, budgetCategories.join('|')]);
   // Show EVERY payment — nothing is hidden as the month progresses. Payments
   // whose date already passed this cycle (auto-paid) sink to the bottom and are
   // rendered dimmed, while still-upcoming ones stay on top, sorted by date.
@@ -250,7 +274,9 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
         <StatsCarousel pages={[
           <TotalsCard key="totals" payments={payments} currency={currency} rates={fx?.rates}
             onClick={() => setStatsDetailOpen(true)} />,
-          <ExpensesStatsCard key="expenses" lists={lists} />,
+          <BudgetHeroCard key="budget" stats={budgetStats}
+            onOpenDetail={() => setBudgetOpen(true)}
+            onOpenSettings={() => setBudgetSettingsOpen(true)} />,
         ]} />
 
         {/* ---- Payments ---- (tap the title to collapse the whole list) */}
@@ -276,13 +302,21 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
           )
         )}
 
-        {/* ---- Free-form lists (shopping & misc, shareable) ---- */}
+        {/* ---- Monthly expenses tracker (budget-aware, shareable) ---- */}
         <div style={{ height: 10 }} />
-        <ExpenseListSection lists={lists} user={user} />
+        <ExpenseListSection lists={lists} settings={settings} setSettings={setSettings}
+          subsMonthly={subsMonthly} onOpenBudget={() => setBudgetOpen(true)} />
       </div>
 
       <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
         payments={payments} currency={currency} rates={fx?.rates} />
+      <BudgetDetailSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
+        stats={budgetStats} prevStats={prevBudgetStats}
+        monthLabel={`${MONTH_NAMES_HE[now.getMonth()]} ${now.getFullYear()}`}
+        onOpenSettings={() => { setBudgetOpen(false); setTimeout(() => setBudgetSettingsOpen(true), 220); }} />
+      <BudgetSettingsSheet open={budgetSettingsOpen} onClose={() => setBudgetSettingsOpen(false)}
+        settings={settings} setSettings={setSettings}
+        categories={budgetCategories} subsMonthly={subsMonthly} />
     </div>
   );
 }

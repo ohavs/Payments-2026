@@ -113,6 +113,7 @@ function AppInner() {
             onOpenPayment={openPayment}
             onOpenAdd={() => setAddOpen(true)}
             settings={settings}
+            setSettings={setSettings}
           />
         )}
         {tab === 'calendar' && (
