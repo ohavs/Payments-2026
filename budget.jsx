@@ -136,13 +136,13 @@ function budgetColor(stats) {
 }
 
 // ---------- Hero card (page in the home widget pager) ----------
-function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings }) {
+function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings, big }) {
   const color = budgetColor(stats);
   const shell = {
     width: '100%', textAlign: 'start', fontFamily: 'inherit', color: 'var(--ink)',
     background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
     backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    border: '1px solid var(--glass-border)', borderRadius: 28, padding: 22,
+    border: '1px solid var(--glass-border)', borderRadius: 28, padding: big ? 24 : 22,
     boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
     position: 'relative', overflow: 'hidden',
   };
@@ -168,20 +168,20 @@ function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings }) {
 
   return (
     <button onClick={onOpenDetail} className="hero-card" style={{ ...shell, cursor: 'pointer', border: '1px solid var(--glass-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-        <ProgressRing pct={stats.pctUsed} color={color}>
-          <div style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: big ? 22 : 18 }}>
+        <ProgressRing pct={stats.pctUsed} color={color} size={big ? 124 : 132} stroke={big ? 13 : 12}>
+          <div style={{ fontSize: big ? 28 : 23, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
             {Math.round(stats.pctUsed)}%
           </div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 3 }}>מהתקרה</div>
+          <div style={{ fontSize: big ? 11.5 : 10.5, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 3 }}>מהתקרה</div>
         </ProgressRing>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
+          <div style={{ fontSize: big ? 13.5 : 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
             {stats.overCap ? 'חריגה מהתקרה' : 'נשאר לבזבז'}
           </div>
           <div style={{
-            fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1,
+            fontSize: big ? 31 : 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1,
             fontVariantNumeric: 'tabular-nums', color: stats.overCap ? '#FF5C5C' : 'var(--ink)',
             marginTop: 2,
           }}>
@@ -191,21 +191,31 @@ function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings }) {
             מתוך {fmtMoney(stats.cap)}
           </div>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-            {stats.daysLeft > 0 && (
-              <span style={pillStyle}>
-                {fmtMoney(stats.dailyAllowance)} ליום · {stats.daysLeft} ימים
-              </span>
-            )}
-            <span style={{ ...pillStyle, background: `color-mix(in srgb, ${color} 20%, transparent)`, color: 'var(--ink)' }}>
-              {stats.overCap ? 'מעל התקרה'
-                : stats.onPace ? 'בקצב טוב'
-                : `מעל הקצב ב-${fmtMoney(Math.abs(stats.paceDelta))}`}
-            </span>
-          </div>
+          {!big && <PaceChips stats={stats} color={color} />}
         </div>
       </div>
+      {big && <div style={{ marginTop: 16 }}><PaceChips stats={stats} color={color} big /></div>}
     </button>
+  );
+}
+
+// "allowed per day" + pace chips. Sits beside the ring on the compact card and
+// on its own full-width row on the large one.
+function PaceChips({ stats, color, big }) {
+  const pill = big ? { ...pillStyle, fontSize: 12.5, padding: '7px 13px' } : pillStyle;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: big ? 8 : 6, marginTop: big ? 0 : 12 }}>
+      {stats.daysLeft > 0 && (
+        <span style={pill}>
+          {fmtMoney(stats.dailyAllowance)} ליום · {stats.daysLeft} ימים
+        </span>
+      )}
+      <span style={{ ...pill, background: `color-mix(in srgb, ${color} 20%, transparent)`, color: 'var(--ink)' }}>
+        {stats.overCap ? 'מעל התקרה'
+          : stats.onPace ? 'בקצב טוב'
+          : `מעל הקצב ב-${fmtMoney(Math.abs(stats.paceDelta))}`}
+      </span>
+    </div>
   );
 }
 
@@ -526,6 +536,6 @@ function BudgetSettingsSheet({ open, onClose, settings, setSettings, categories,
 }
 
 Object.assign(window, {
-  computeBudgetStats, useSubsMonthly, ProgressRing, BudgetHeroCard,
+  PaceChips, computeBudgetStats, useSubsMonthly, ProgressRing, BudgetHeroCard,
   BudgetDetailSheet, BudgetSettingsSheet, DailyBars, MeterRow, StatTile, budgetColor,
 });

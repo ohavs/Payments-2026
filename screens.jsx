@@ -211,22 +211,19 @@ function HighlightRow({ icon, label, value }) {
 }
 
 
-// ---------- HOME ----------
-// Layout: header + compact stats card pinned at top, stacked card list fills the rest
-// and scrolls INTERNALLY (the page itself does NOT scroll).
-function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd, settings, setSettings }) {
-  const [statsDetailOpen, setStatsDetailOpen] = useState(false);
+// ---------- HOME / EXPENSES ----------
+// Expenses + budget own this whole tab, so everything can breathe: one large
+// budget card, then the month's expenses. Subscriptions live in their own tab
+// and are linked from the strip at the bottom.
+function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSettings, onGoSubs }) {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [budgetSettingsOpen, setBudgetSettingsOpen] = useState(false);
-  // Collapse state for each home section — persisted per device so the choice
-  // survives reloads. Tap a section title to fold/unfold it.
-  const [paymentsCollapsed, setPaymentsCollapsed] = usePersistentFlag('home.paymentsCollapsed', false);
-  const fx = useExchangeRates();
+  const [addSignal, setAddSignal] = useState(0);
   const currency = settings.defaultCurrency || '₪';
   const lists = useLists(user?.uid, user);
 
-  // Budget for the *current* month — the widget card and its detail sheet always
-  // report "now", independent of the month being browsed in the expenses list.
+  // Budget always reports the *current* month, independent of the month being
+  // browsed in the expenses list below.
   const subsMonthly = useSubsMonthly(payments, currency);
   const budgetCategories = (lists.activeList?.groups && lists.activeList.groups.length)
     ? lists.activeList.groups : DEFAULT_CATEGORIES;
@@ -246,70 +243,51 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
     const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return computeBudgetStats({ ...budgetArgs, y: p.getFullYear(), m: p.getMonth() });
   }, [lists.items, settings, subsMonthly, budgetCategories.join('|')]);
-  // Show EVERY payment — nothing is hidden as the month progresses. Payments
-  // whose date already passed this cycle (auto-paid) sink to the bottom and are
-  // rendered dimmed, while still-upcoming ones stay on top, sorted by date.
-  const upcoming = useMemo(() => {
-    return [...payments].sort((a, b) => {
-      const pa = isAutoPaid(a), pb = isAutoPaid(b);
-      if (pa !== pb) return pa ? 1 : -1; // upcoming first, paid last
-      return parseISODate(a.nextDate) - parseISODate(b.nextDate);
-    });
-  }, [payments]);
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      height: '100%', minHeight: 0,
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div style={{ padding: '0 18px', flexShrink: 0 }}>
-        <Header onOpenAdd={onOpenAdd} user={user} fallbackName={settings.userName} />
+        <Header onOpenAdd={() => setAddSignal(n => n + 1)} user={user}
+          fallbackName={settings.userName} addLabel="הוסף הוצאה" />
       </div>
 
-      {/* Single scroll surface holding the stats card + both sections. */}
       <div className="hide-scroll" style={{
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         padding: '0 18px 140px', WebkitOverflowScrolling: 'touch',
       }}>
-        <StatsCarousel pages={[
-          <TotalsCard key="totals" payments={payments} currency={currency} rates={fx?.rates}
-            onClick={() => setStatsDetailOpen(true)} />,
-          <BudgetHeroCard key="budget" stats={budgetStats}
+        <div style={{ marginBottom: 16 }}>
+          <BudgetHeroCard stats={budgetStats} big
             onOpenDetail={() => setBudgetOpen(true)}
-            onOpenSettings={() => setBudgetSettingsOpen(true)} />,
-        ]} />
+            onOpenSettings={() => setBudgetSettingsOpen(true)} />
+        </div>
 
-        {/* ---- Payments ---- (tap the title to collapse the whole list) */}
-        <SectionHeader title="תשלומים" count={paymentsLoading ? null : upcoming.length}
-          collapsible collapsed={paymentsCollapsed}
-          onToggle={() => setPaymentsCollapsed(v => !v)} />
-        {!paymentsCollapsed && (
-          paymentsLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-              <Spinner size={28} color="var(--accent)" />
-            </div>
-          ) : upcoming.length > 0 ? (
-            <StackedPaymentList payments={upcoming} onOpenDetail={onOpenPayment} embedded />
-          ) : (
-            <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-dim)' }}>
-              <div style={{ fontSize: 14, marginBottom: 12 }}>אין תשלומים קרובים</div>
-              <button onClick={onOpenAdd} style={{
-                background: 'var(--accent)', color: 'var(--accent-fg)',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                padding: '10px 18px', borderRadius: 999, fontWeight: 700, fontSize: 14,
-              }}>הוסף תשלום ראשון</button>
-            </div>
-          )
-        )}
-
-        {/* ---- Monthly expenses tracker (budget-aware, shareable) ---- */}
-        <div style={{ height: 10 }} />
         <ExpenseListSection lists={lists} settings={settings} setSettings={setSettings}
-          subsMonthly={subsMonthly} onOpenBudget={() => setBudgetOpen(true)} />
+          subsMonthly={subsMonthly} onOpenBudget={() => setBudgetOpen(true)}
+          openAddSignal={addSignal} big />
+
+        {/* Link across to the subscriptions tab — the two stay connected. */}
+        <button onClick={onGoSubs} style={{
+          width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 13,
+          background: 'var(--surface-1)', border: 'none', cursor: 'pointer',
+          fontFamily: 'inherit', color: 'var(--ink)', textAlign: 'start',
+          borderRadius: 20, padding: '16px 18px',
+        }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 13, background: 'var(--surface-2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <Icon name="repeat" size={19} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.01em' }}>מנויים ותשלומים קבועים</div>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+              {payments.length} פעילים · {fmtMoney(subsMonthly, currency)} לחודש
+            </div>
+          </div>
+          <Icon name="chevron-left" size={19} />
+        </button>
       </div>
 
-      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
-        payments={payments} currency={currency} rates={fx?.rates} />
       <BudgetDetailSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
         stats={budgetStats} prevStats={prevBudgetStats}
         monthLabel={`${MONTH_NAMES_HE[now.getMonth()]} ${now.getFullYear()}`}
@@ -321,20 +299,77 @@ function HomeScreen({ user, payments, paymentsLoading, onOpenPayment, onOpenAdd,
   );
 }
 
-// Small persisted boolean flag backed by localStorage (per device).
-function usePersistentFlag(key, initial) {
-  const [val, setVal] = useState(() => {
-    try { const v = localStorage.getItem(key); return v == null ? initial : v === '1'; }
-    catch { return initial; }
-  });
-  const set = React.useCallback((next) => {
-    setVal(prev => {
-      const resolved = typeof next === 'function' ? next(prev) : next;
-      try { localStorage.setItem(key, resolved ? '1' : '0'); } catch {}
-      return resolved;
+// ---------- SUBSCRIPTIONS ----------
+// Recurring payments get their own tab: the totals card on top, then the full
+// stacked list filling the rest of the screen and scrolling internally.
+function SubscriptionsScreen({ payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
+  const [statsDetailOpen, setStatsDetailOpen] = useState(false);
+  const fx = useExchangeRates();
+  const currency = settings.defaultCurrency || '₪';
+
+  // Everything stays visible; already-paid ones sink to the bottom, dimmed.
+  const upcoming = useMemo(() => {
+    return [...payments].sort((a, b) => {
+      const pa = isAutoPaid(a), pb = isAutoPaid(b);
+      if (pa !== pb) return pa ? 1 : -1;
+      return parseISODate(a.nextDate) - parseISODate(b.nextDate);
     });
-  }, [key]);
-  return [val, set];
+  }, [payments]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <div style={{ padding: '0 18px', flexShrink: 0 }}>
+        <ScreenTitle title="מנויים" onOpenAdd={onOpenAdd} addLabel="הוסף תשלום"
+          sub={paymentsLoading ? null : `${upcoming.length} תשלומים קבועים`} />
+        <TotalsCard payments={payments} currency={currency} rates={fx?.rates}
+          onClick={() => setStatsDetailOpen(true)} />
+        <div style={{ height: 16 }} />
+      </div>
+
+      {paymentsLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 18px' }}>
+          <Spinner size={28} color="var(--accent)" />
+        </div>
+      ) : upcoming.length > 0 ? (
+        <StackedPaymentList payments={upcoming} onOpenDetail={onOpenPayment} />
+      ) : (
+        <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-dim)' }}>
+          <div style={{ fontSize: 15, marginBottom: 14 }}>אין עדיין מנויים</div>
+          <button onClick={onOpenAdd} style={{
+            background: 'var(--accent)', color: 'var(--accent-fg)',
+            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '12px 20px', borderRadius: 999, fontWeight: 800, fontSize: 15,
+          }}>הוסף תשלום ראשון</button>
+        </div>
+      )}
+
+      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
+        payments={payments} currency={currency} rates={fx?.rates} />
+    </div>
+  );
+}
+
+// Screen title row with an add button — used by tabs that aren't the greeting home.
+function ScreenTitle({ title, sub, onOpenAdd, addLabel }) {
+  return (
+    <div style={{ padding: '18px 0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div style={{ minWidth: 0 }}>
+        <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em' }}>{title}</h1>
+        {sub && <div style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600, marginTop: 3 }}>{sub}</div>}
+      </div>
+      {onOpenAdd && (
+        <button onClick={onOpenAdd} aria-label={addLabel || 'הוסף'} style={{
+          background: 'var(--accent)', color: 'var(--accent-fg)',
+          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 6px 18px -6px rgba(0,0,0,.35)',
+        }}>
+          <Icon name="plus" size={22} strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
+  );
 }
 
 // Variation A: Stacked sections
@@ -441,7 +476,7 @@ function AccordionSections({ byCycle, onOpenPayment }) {
 }
 
 // Page header — uses Google profile photo when available
-function Header({ onOpenAdd, user, fallbackName }) {
+function Header({ onOpenAdd, user, fallbackName, addLabel }) {
   const displayName = user?.displayName || fallbackName || 'משתמש';
   const photoURL = user?.photoURL;
   const initial = (displayName || 'מ')[0];
@@ -468,14 +503,14 @@ function Header({ onOpenAdd, user, fallbackName }) {
           </div>
         </div>
       </div>
-      <button onClick={onOpenAdd} aria-label="הוסף תשלום" style={{
+      <button onClick={onOpenAdd} aria-label={addLabel || 'הוסף'} style={{
         background: 'var(--accent)', color: 'var(--accent-fg)',
         border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-        width: 42, height: 42, borderRadius: '50%',
+        width: 46, height: 46, borderRadius: '50%',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 6px 18px -6px rgba(242,255,68,.5)',
       }}>
-        <Icon name="plus" size={20} strokeWidth={2.5} />
+        <Icon name="plus" size={22} strokeWidth={2.5} />
       </button>
     </div>
   );
@@ -879,4 +914,4 @@ function SettingsGroup({ title, children }) {
   );
 }
 
-Object.assign(window, { HomeScreen, CalendarScreen, SettingsScreen });
+Object.assign(window, { HomeScreen, SubscriptionsScreen, CalendarScreen, SettingsScreen, ScreenTitle });

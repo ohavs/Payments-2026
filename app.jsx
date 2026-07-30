@@ -102,18 +102,26 @@ function AppInner() {
         </div>
         <div style={{
           flex: 1, minHeight: 0,
-          overflowY: tab === 'home' ? 'hidden' : 'auto',
+          // home + subs manage their own internal scrolling
+          overflowY: (tab === 'home' || tab === 'subs') ? 'hidden' : 'auto',
           overflowX: 'hidden',
         }}>
         {tab === 'home' && (
           <HomeScreen
             user={user}
             payments={payments}
+            settings={settings}
+            setSettings={setSettings}
+            onGoSubs={() => setTab('subs')}
+          />
+        )}
+        {tab === 'subs' && (
+          <SubscriptionsScreen
+            payments={payments}
             paymentsLoading={paymentsLoading}
             onOpenPayment={openPayment}
             onOpenAdd={() => setAddOpen(true)}
             settings={settings}
-            setSettings={setSettings}
           />
         )}
         {tab === 'calendar' && (
@@ -181,7 +189,8 @@ function App() {
 
 function BottomNav({ tab, setTab, onAdd }) {
   const items = [
-    { id: 'home', icon: 'home', label: 'בית' },
+    { id: 'home', icon: 'home', label: 'הוצאות' },
+    { id: 'subs', icon: 'repeat', label: 'מנויים' },
     { id: 'calendar', icon: 'calendar', label: 'לוח' },
     { id: 'settings', icon: 'settings', label: 'הגדרות' },
   ];

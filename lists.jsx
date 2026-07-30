@@ -170,7 +170,7 @@ function useLists(uid, user) {
 // ---------- Home section ----------
 // Budget-aware expenses card: month navigator, headline total with the ceiling
 // progress, and two ways to read the data — by category (accordion) or by date.
-function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenBudget }) {
+function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenBudget, openAddSignal, big }) {
   const { loading, activeList, activeListId, items, ops } = lists;
   const [collapsed, setCollapsed] = useStickyState('home.expensesCollapsed', false);
   const [byDate, setByDate] = useStickyState('home.expensesByDate', false);
@@ -221,6 +221,11 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
 
   const openAdd = (cat) => { setAddCat(cat || categories[0]); setAddOpen(true); };
 
+  // The screen's header "+" lives outside this component; it bumps a counter.
+  React.useEffect(() => {
+    if (openAddSignal) openAdd();
+  }, [openAddSignal]);
+
   const manageBtn = (
     <button onClick={() => setManageOpen(true)} aria-label="ניהול הוצאות" style={{
       width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
@@ -267,14 +272,14 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
             <button onClick={onOpenBudget} style={{
               width: '100%', textAlign: 'start', background: 'transparent', border: 'none',
               cursor: onOpenBudget ? 'pointer' : 'default', fontFamily: 'inherit', color: 'var(--ink)',
-              padding: '12px 16px 15px',
+              padding: big ? '14px 18px 18px' : '12px 16px 15px',
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
                   סה״כ הוצאות
                   {stats.committed > 0 ? ` + מנויים ${fmtMoney(stats.committed)}` : ''}
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: big ? 34 : 28, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                   {fmtMoney(stats.used)}
                 </div>
               </div>
@@ -305,8 +310,8 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
 
             {/* View switch */}
             <div style={{ display: 'flex', gap: 4, padding: '0 12px 12px' }}>
-              <SegBtn active={!byDate} onClick={() => setByDate(false)}>קטגוריות</SegBtn>
-              <SegBtn active={byDate} onClick={() => setByDate(true)}>תאריכים</SegBtn>
+              <SegBtn active={!byDate} big={big} onClick={() => setByDate(false)}>קטגוריות</SegBtn>
+              <SegBtn active={byDate} big={big} onClick={() => setByDate(true)}>תאריכים</SegBtn>
             </div>
 
             {stats.count === 0 ? (
@@ -339,7 +344,7 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
                       </div>
                       <div style={{ paddingBottom: 4 }}>
                         {list.map(it => (
-                          <ExpenseRow key={it.id} item={it} showCategory onOpen={() => setEditItem(it)} />
+                          <ExpenseRow key={it.id} item={it} showCategory big={big} onOpen={() => setEditItem(it)} />
                         ))}
                       </div>
                     </div>
@@ -356,7 +361,7 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
                     expanded={openCat === r.cat}
                     onToggle={() => setOpenCat(prev => prev === r.cat ? null : r.cat)}
                     onAdd={r.cat === 'ללא קטגוריה' ? null : () => openAdd(r.cat)}
-                    onOpen={(it) => setEditItem(it)} />
+                    big={big} onOpen={(it) => setEditItem(it)} />
                 ))}
               </div>
             )}
@@ -378,13 +383,13 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
   );
 }
 
-function SegBtn({ active, children, onClick }) {
+function SegBtn({ active, children, onClick, big }) {
   return (
     <button onClick={onClick} style={{
-      flex: 1, padding: '9px 0', borderRadius: 11, border: 'none', cursor: 'pointer',
+      flex: 1, padding: big ? '12px 0' : '9px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
       background: active ? 'var(--surface-3)' : 'var(--surface-2)',
       color: active ? 'var(--ink)' : 'var(--ink-dim)',
-      fontFamily: 'inherit', fontWeight: 800, fontSize: 12.5,
+      fontFamily: 'inherit', fontWeight: 800, fontSize: big ? 14 : 12.5,
       transition: 'background .15s ease, color .15s ease',
     }}>{children}</button>
   );
@@ -392,11 +397,11 @@ function SegBtn({ active, children, onClick }) {
 
 // One category: a clear heading with its total and a share/ceiling bar.
 // Tap to expand the expenses inside it — keeps the card compact and scannable.
-function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen }) {
+function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen, big }) {
   const pct = row.cap > 0 ? row.capPct : row.pct;
   return (
     <div style={{ borderBottom: '1px solid var(--divider)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 11px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: big ? '15px 18px 14px' : '12px 16px 11px' }}>
         <button onClick={onToggle} style={{
           flex: 1, minWidth: 0, textAlign: 'start', background: 'transparent', border: 'none',
           cursor: 'pointer', fontFamily: 'inherit', color: 'var(--ink)', padding: 0,
@@ -407,11 +412,11 @@ function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen })
                 transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
                 <Icon name="chevron-down" size={15} />
               </span>
-              <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.01em',
+              <span style={{ fontSize: big ? 18.5 : 16.5, fontWeight: 800, letterSpacing: '-0.01em',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.cat}</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)' }}>{row.count}</span>
             </span>
-            <span style={{ fontSize: 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+            <span style={{ fontSize: big ? 17.5 : 15.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
               color: row.overCap ? '#FF5C5C' : 'var(--ink)', whiteSpace: 'nowrap' }}>
               {fmtMoney(row.sum)}
             </span>
@@ -442,7 +447,7 @@ function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen })
         <div className="stack-expand-wrap">
           <div style={{ paddingBottom: 6 }}>
             {items.map(it => (
-              <ExpenseRow key={it.id} item={it} onOpen={() => onOpen(it)} />
+              <ExpenseRow key={it.id} item={it} big={big} onOpen={() => onOpen(it)} />
             ))}
           </div>
         </div>
@@ -451,24 +456,25 @@ function CategoryBlock({ row, spent, items, expanded, onToggle, onAdd, onOpen })
   );
 }
 
-function ExpenseRow({ item, onOpen, showCategory }) {
+function ExpenseRow({ item, onOpen, showCategory, big }) {
   const d = expenseDate(item);
   const meta = [showCategory ? (item.group || 'ללא קטגוריה') : fmtDateHe(d), item.note].filter(Boolean).join(' · ');
   return (
     <button onClick={onOpen} style={{
-      width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '7px 16px 7px 34px',
+      width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+      padding: big ? '11px 18px 11px 38px' : '7px 16px 7px 34px',
       background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
       color: 'var(--ink)', textAlign: 'start',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.01em',
+        <div style={{ fontSize: big ? 16 : 14.5, fontWeight: 600, letterSpacing: '-0.01em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.title || 'הוצאה'}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 1,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+      <div style={{ fontSize: big ? 16.5 : 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
         {fmtMoney(item.amount)}
       </div>
     </button>
