@@ -219,6 +219,9 @@ function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSet
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [budgetSettingsOpen, setBudgetSettingsOpen] = useState(false);
   const [addSignal, setAddSignal] = useState(0);
+  // The month the whole tab reports on — the statistics card navigates it and
+  // the expenses list below follows, so the two can never disagree.
+  const [view, setView] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const currency = settings.defaultCurrency || '₪';
   const lists = useLists(user?.uid, user);
 
@@ -236,13 +239,18 @@ function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSet
     categories: budgetCategories, categoryCaps: settings.categoryCaps || {},
   };
   const budgetStats = useMemo(
-    () => computeBudgetStats({ ...budgetArgs, y: now.getFullYear(), m: now.getMonth() }),
-    [lists.items, settings, subsMonthly, budgetCategories.join('|')]
+    () => computeBudgetStats({ ...budgetArgs, y: view.y, m: view.m }),
+    [lists.items, settings, subsMonthly, budgetCategories.join('|'), view.y, view.m]
   );
   const prevBudgetStats = useMemo(() => {
-    const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const p = new Date(view.y, view.m - 1, 1);
     return computeBudgetStats({ ...budgetArgs, y: p.getFullYear(), m: p.getMonth() });
-  }, [lists.items, settings, subsMonthly, budgetCategories.join('|')]);
+  }, [lists.items, settings, subsMonthly, budgetCategories.join('|'), view.y, view.m]);
+  const atCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
+  const shiftMonth = (delta) => setView(v => {
+    const d = new Date(v.y, v.m + delta, 1);
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -257,12 +265,14 @@ function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSet
       }}>
         <div style={{ marginBottom: 16 }}>
           <BudgetHeroCard stats={budgetStats} big
+            monthLabel={`${MONTH_NAMES_HE[view.m]} ${view.y}`}
+            onShiftMonth={shiftMonth} atCurrentMonth={atCurrentMonth}
             onOpenDetail={() => setBudgetOpen(true)}
             onOpenSettings={() => setBudgetSettingsOpen(true)} />
         </div>
 
-        <ExpenseListSection lists={lists} settings={settings} setSettings={setSettings}
-          subsMonthly={subsMonthly} onOpenBudget={() => setBudgetOpen(true)}
+        <ExpenseListSection lists={lists} settings={settings}
+          stats={budgetStats} categories={budgetCategories}
           openAddSignal={addSignal} big />
 
         {/* Link across to the subscriptions tab — the two stay connected. */}
@@ -290,7 +300,7 @@ function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSet
 
       <BudgetDetailSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
         stats={budgetStats} prevStats={prevBudgetStats}
-        monthLabel={`${MONTH_NAMES_HE[now.getMonth()]} ${now.getFullYear()}`}
+        monthLabel={`${MONTH_NAMES_HE[view.m]} ${view.y}`}
         onOpenSettings={() => { setBudgetOpen(false); setTimeout(() => setBudgetSettingsOpen(true), 220); }} />
       <BudgetSettingsSheet open={budgetSettingsOpen} onClose={() => setBudgetSettingsOpen(false)}
         settings={settings} setSettings={setSettings}

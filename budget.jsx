@@ -135,106 +135,166 @@ function budgetColor(stats) {
   return '#22C55E';
 }
 
-// ---------- Hero card (page in the home widget pager) ----------
-function BudgetHeroCard({ stats, onOpenDetail, onOpenSettings, big }) {
+// ---------- Statistics card (top of the expenses tab) ----------
+// Compact by default: the month it reports on, the ring and what's left.
+// The chevron expands it in place to reveal the pace chips, the month totals
+// and the per-category breakdown; a link at the bottom opens the full sheet.
+function BudgetHeroCard({ stats, monthLabel, onShiftMonth, atCurrentMonth, onOpenDetail, onOpenSettings, big }) {
+  const [expanded, setExpanded] = useStickyState('home.statsExpanded', false);
   const color = budgetColor(stats);
-  const shell = {
-    width: '100%', textAlign: 'start', fontFamily: 'inherit', color: 'var(--ink)',
-    background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
-    backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    border: '1px solid var(--glass-border)', borderRadius: 28, padding: big ? 24 : 22,
-    boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
-    position: 'relative', overflow: 'hidden',
-  };
-
-  // No ceiling yet → a single clear call to action.
-  if (!stats.hasCap) {
-    return (
-      <div style={{ ...shell, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 6 }}>תקציב חודשי</div>
-          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.5, color: 'var(--ink-dim)' }}>
-            הגדר הכנסה ותקרת הוצאות כדי לראות כמה נשאר לבזבז, מותר ליום, וקצב מול היעד.
-          </div>
-        </div>
-        <button onClick={onOpenSettings} style={{
-          alignSelf: 'flex-start', background: 'var(--accent)', color: 'var(--accent-fg)',
-          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          padding: '11px 18px', borderRadius: 999, fontWeight: 800, fontSize: 14,
-        }}>הגדר תקציב</button>
-      </div>
-    );
-  }
+  const ringSize = big ? 112 : 100;
 
   return (
-    <button onClick={onOpenDetail} className="hero-card" style={{ ...shell, cursor: 'pointer', border: '1px solid var(--glass-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: big ? 22 : 18 }}>
-        <ProgressRing pct={stats.pctUsed} color={color} size={big ? 124 : 132} stroke={big ? 13 : 12}>
-          <div style={{ fontSize: big ? 28 : 23, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-            {Math.round(stats.pctUsed)}%
-          </div>
-          <div style={{ fontSize: big ? 11.5 : 10.5, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 3 }}>מהתקרה</div>
-        </ProgressRing>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: big ? 13.5 : 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
-            {stats.overCap ? 'חריגה מהתקרה' : 'נשאר לבזבז'}
-          </div>
-          <div style={{
-            fontSize: big ? 31 : 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1,
-            fontVariantNumeric: 'tabular-nums', color: stats.overCap ? '#FF5C5C' : 'var(--ink)',
-            marginTop: 2,
-          }}>
-            {fmtMoney(Math.abs(stats.remaining))}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-dim)', fontWeight: 600, marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-            מתוך {fmtMoney(stats.cap)}
-          </div>
-
-          {!big && <PaceChips stats={stats} color={color} />}
-        </div>
-      </div>
-      {big && <div style={{ marginTop: 16 }}><PaceChips stats={stats} color={color} big /></div>}
-      {big && stats.catRows.length > 0 && (
-        <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--divider)' }}>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-dim)', letterSpacing: '.05em',
-            textTransform: 'uppercase', marginBottom: 12 }}>
-            לפי קטגוריה
-          </div>
-          {stats.catRows.slice(0, 4).map(r => (
-            <div key={r.cat} style={{ marginBottom: 11 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 5 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.cat}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
-                  color: r.overCap ? '#FF5C5C' : 'var(--ink-dim)' }}>
-                  {r.cap > 0 ? `${fmtMoney(r.sum)} / ${fmtMoney(r.cap)}` : `${fmtMoney(r.sum)} · ${r.pct}%`}
-                </span>
-              </div>
-              <div style={{ height: 5, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                <div style={{ width: `${clamp(r.cap > 0 ? r.capPct : r.pct, 0, 100)}%`, height: '100%', borderRadius: 999,
-                  background: r.overCap ? '#FF5C5C' : 'var(--accent)',
-                  transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
-              </div>
-            </div>
-          ))}
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 10,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-            {stats.catRows.length > 4 ? `ועוד ${stats.catRows.length - 4} · ` : ''}לכל הסטטיסטיקות
-            <Icon name="chevron-left" size={13} />
-          </div>
+    <div style={{
+      width: '100%', fontFamily: 'inherit', color: 'var(--ink)',
+      background: 'color-mix(in srgb, var(--surface-1) 78%, transparent)',
+      backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      border: '1px solid var(--glass-border)', borderRadius: 26, padding: big ? '14px 18px 16px' : '12px 16px 14px',
+      boxShadow: '0 18px 40px -16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Month navigator — this card owns the month the whole tab reports on. */}
+      {onShiftMonth && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-2)"
+            onClick={() => onShiftMonth(-1)} ariaLabel="חודש קודם" />
+          <div style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.01em' }}>{monthLabel}</div>
+          <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-2)"
+            onClick={() => onShiftMonth(1)} ariaLabel="חודש הבא"
+            style={{ opacity: atCurrentMonth ? .35 : 1 }} />
         </div>
       )}
-    </button>
+
+      {/* Headline */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {stats.hasCap ? (
+          <>
+            <ProgressRing pct={stats.pctUsed} color={color} size={ringSize} stroke={11}>
+              <div style={{ fontSize: big ? 22 : 20, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                {Math.round(stats.pctUsed)}%
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-dim)', marginTop: 2 }}>מהתקרה</div>
+            </ProgressRing>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
+                {stats.overCap ? 'חריגה מהתקרה' : 'נשאר לבזבז'}
+              </div>
+              <div style={{
+                fontSize: big ? 29 : 26, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15,
+                fontVariantNumeric: 'tabular-nums', marginTop: 1,
+                color: stats.overCap ? '#FF5C5C' : 'var(--ink)',
+              }}>
+                {fmtMoney(Math.abs(stats.remaining))}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                מתוך {fmtMoney(stats.cap)}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>סה״כ הוצאות</div>
+            <div style={{ fontSize: big ? 30 : 27, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, fontVariantNumeric: 'tabular-nums' }}>
+              {fmtMoney(stats.used)}
+            </div>
+            <button onClick={onOpenSettings} style={{
+              marginTop: 8, background: 'var(--accent)', color: 'var(--accent-fg)',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              padding: '8px 14px', borderRadius: 999, fontWeight: 800, fontSize: 13,
+            }}>הגדר תקציב</button>
+          </div>
+        )}
+
+        <button onClick={() => setExpanded(v => !v)} aria-label={expanded ? 'הצג פחות' : 'הצג עוד'}
+          aria-expanded={expanded} style={{
+          width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+          background: 'var(--surface-2)', color: 'var(--ink)', flexShrink: 0, alignSelf: 'flex-start',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ display: 'inline-flex', transition: 'transform .22s ease',
+            transform: expanded ? 'rotate(180deg)' : 'none' }}>
+            <Icon name="chevron-down" size={17} />
+          </span>
+        </button>
+      </div>
+
+      {/* Expanded detail */}
+      <div className="stack-expand-area" data-open={expanded ? 'true' : 'false'}>
+        <div className="stack-expand-wrap">
+          <div style={{ paddingTop: 14 }}>
+            {stats.hasCap && <PaceChips stats={stats} color={color} big />}
+
+            {/* Month totals — moved up from the expenses list */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9, marginTop: 13 }}>
+              <MiniTile label="הוצאות שרשמתי" value={fmtMoney(stats.spent)} sub={`${stats.count} רשומות`} />
+              <MiniTile label="מנויים ותשלומים" value={fmtMoney(stats.committed)}
+                sub={stats.committed > 0 ? 'שווה-ערך חודשי' : 'לא נכללים'} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              marginTop: 11, paddingTop: 11, borderTop: '1px solid var(--divider)' }}>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--ink-dim)' }}>סה״כ החודש</span>
+              <span style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+                {fmtMoney(stats.used)}
+              </span>
+            </div>
+
+            {stats.catRows.length > 0 && (
+              <div style={{ marginTop: 15 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--ink-dim)', letterSpacing: '.05em',
+                  textTransform: 'uppercase', marginBottom: 11 }}>
+                  לפי קטגוריה
+                </div>
+                {stats.catRows.slice(0, 4).map(r => (
+                  <div key={r.cat} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 700, minWidth: 0,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.cat}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+                        color: r.overCap ? '#FF5C5C' : 'var(--ink-dim)' }}>
+                        {r.cap > 0 ? `${fmtMoney(r.sum)} / ${fmtMoney(r.cap)}` : `${fmtMoney(r.sum)} · ${r.pct}%`}
+                      </span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                      <div style={{ width: `${clamp(r.cap > 0 ? r.capPct : r.pct, 0, 100)}%`, height: '100%', borderRadius: 999,
+                        background: r.overCap ? '#FF5C5C' : 'var(--accent)',
+                        transition: 'width .45s cubic-bezier(.22,.61,.36,1)' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={onOpenDetail} style={{
+              width: '100%', marginTop: 12, padding: '11px', borderRadius: 13, border: 'none', cursor: 'pointer',
+              background: 'var(--surface-2)', color: 'var(--ink)', fontFamily: 'inherit',
+              fontWeight: 800, fontSize: 13,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              {stats.catRows.length > 4 ? `ועוד ${stats.catRows.length - 4} · ` : ''}לכל הסטטיסטיקות
+              <Icon name="chevron-left" size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-// "allowed per day" + pace chips. Sits beside the ring on the compact card and
-// on its own full-width row on the large one.
+function MiniTile({ label, value, sub }) {
+  return (
+    <div style={{ background: 'var(--surface-2)', borderRadius: 14, padding: '10px 12px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-dim)', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      {sub && <div style={{ fontSize: 10.5, color: 'var(--ink-dim)', marginTop: 2, fontWeight: 600 }}>{sub}</div>}
+    </div>
+  );
+}
+
+// "allowed per day" + pace chips.
 function PaceChips({ stats, color, big }) {
   const pill = big ? { ...pillStyle, fontSize: 12.5, padding: '7px 13px' } : pillStyle;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: big ? 8 : 6, marginTop: big ? 0 : 12 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: big ? 8 : 6 }}>
       {stats.daysLeft > 0 && (
         <span style={pill}>
           {fmtMoney(stats.dailyAllowance)} ליום · {stats.daysLeft} ימים
@@ -248,7 +308,6 @@ function PaceChips({ stats, color, big }) {
     </div>
   );
 }
-
 const pillStyle = {
   padding: '5px 10px', borderRadius: 999, background: 'var(--surface-2)',
   fontSize: 11.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
@@ -566,6 +625,6 @@ function BudgetSettingsSheet({ open, onClose, settings, setSettings, categories,
 }
 
 Object.assign(window, {
-  PaceChips, computeBudgetStats, useSubsMonthly, ProgressRing, BudgetHeroCard,
+  PaceChips, MiniTile, computeBudgetStats, useSubsMonthly, ProgressRing, BudgetHeroCard,
   BudgetDetailSheet, BudgetSettingsSheet, DailyBars, MeterRow, StatTile, budgetColor,
 });

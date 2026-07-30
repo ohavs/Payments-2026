@@ -170,7 +170,7 @@ function useLists(uid, user) {
 // ---------- Home section ----------
 // Budget-aware expenses card: month navigator, headline total with the ceiling
 // progress, and two ways to read the data — by category (accordion) or by date.
-function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenBudget, openAddSignal, big }) {
+function ExpenseListSection({ lists, settings, stats, categories, openAddSignal, big }) {
   const { loading, activeList, activeListId, items, ops } = lists;
   const [collapsed, setCollapsed] = useStickyState('home.expensesCollapsed', false);
   const [byDate, setByDate] = useStickyState('home.expensesByDate', false);
@@ -179,24 +179,7 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
   const [manageOpen, setManageOpen] = React.useState(false);
   const [addCat, setAddCat] = React.useState(null);
   const [openCat, setOpenCat] = React.useState(null);
-  const [view, setView] = React.useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const toast = useToast();
-
-  const categories = (activeList?.groups && activeList.groups.length) ? activeList.groups : DEFAULT_CATEGORIES;
-
-  const stats = React.useMemo(() => computeBudgetStats({
-    items, y: view.y, m: view.m,
-    income: Number(settings?.monthlyIncome) || 0,
-    cap: Number(settings?.monthlyCap) || 0,
-    subsMonthly, includeSubs: settings?.includeSubsInBudget !== false,
-    categories, categoryCaps: settings?.categoryCaps || {},
-  }), [items, view.y, view.m, settings, subsMonthly, categories.join('|')]);
-
-  const shiftMonth = (delta) => {
-    const d = new Date(view.y, view.m + delta, 1);
-    setView({ y: d.getFullYear(), m: d.getMonth() });
-    setOpenCat(null);
-  };
 
   // Expenses of the viewed month, grouped by day (newest first).
   const dayGroups = React.useMemo(() => {
@@ -255,43 +238,8 @@ function ExpenseListSection({ lists, settings, setSettings, subsMonthly, onOpenB
           </div>
         ) : (
           <div style={{ background: 'var(--surface-1)', borderRadius: 22, overflow: 'hidden' }}>
-            {/* Month navigator */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 12px 0' }}>
-              <IconButton name="chevron-right" size={30} iconSize={16} bg="var(--surface-2)"
-                onClick={() => shiftMonth(-1)} ariaLabel="חודש קודם" />
-              <div style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.01em' }}>
-                {MONTH_NAMES_HE[view.m]} {view.y}
-              </div>
-              <IconButton name="chevron-left" size={30} iconSize={16} bg="var(--surface-2)"
-                onClick={() => shiftMonth(1)} ariaLabel="חודש הבא" />
-            </div>
-
-            {/* Headline total + ceiling progress */}
-            <button onClick={onOpenBudget} style={{
-              width: '100%', textAlign: 'start', background: 'transparent', border: 'none',
-              cursor: onOpenBudget ? 'pointer' : 'default', fontFamily: 'inherit', color: 'var(--ink)',
-              padding: big ? '14px 18px 18px' : '12px 16px 15px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-dim)' }}>
-                  סה״כ הוצאות
-                  {stats.committed > 0 ? ` + מנויים ${fmtMoney(stats.committed)}` : ''}
-                </div>
-                <div style={{ fontSize: big ? 34 : 28, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtMoney(stats.used)}
-                </div>
-              </div>
-
-              {!stats.hasCap && (
-                <div style={{ marginTop: 9, fontSize: 12, fontWeight: 700, color: 'var(--accent)',
-                  display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  הגדר תקציב חודשי <Icon name="chevron-left" size={13} />
-                </div>
-              )}
-            </button>
-
             {/* View switch */}
-            <div style={{ display: 'flex', gap: 4, padding: '0 12px 12px' }}>
+            <div style={{ display: 'flex', gap: 4, padding: big ? '12px 12px' : '10px 12px' }}>
               <SegBtn active={!byDate} big={big} onClick={() => setByDate(false)}>קטגוריות</SegBtn>
               <SegBtn active={byDate} big={big} onClick={() => setByDate(true)}>תאריכים</SegBtn>
             </div>
