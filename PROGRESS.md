@@ -17,9 +17,10 @@
   - CI על כל ענף. הפריסה מריצה lint, בדיקות ו־build, ואחרי הפריסה בדיקת smoke על האתר החי
 
 ## הבא
-- [ ] שלב 2: Capacitor + Android, כניסת Google נייטיב, APK חתום ב־GitHub Releases, "בדוק עדכונים" באפליקציה
-  - רישום אפליקציית Android ב־Firebase (`com.ohavs.payments`) ו־SHA דרך ה־CI עם `FIREBASE_SERVICE_ACCOUNT`. אם אין הרשאה, ידני
-  - מעבר ל־Firebase modular SDK (החבילה היום 336KB gzip, בעיקר compat)
+- [ ] שלב 2: Capacitor + Android, כניסת Google נייטיב, APK חתום ב־GitHub Releases, "בדוק עדכונים" באפליקציה (בעבודה)
+  - [x] פרויקט Android, אייקון ו־splash, חתימה, `android.yml`, בדיקת emulator
+  - [x] אפליקציית Android רשומה ב־Firebase (`1:267719533646:android:18a498064f979005734f1f`) עם SHA, `google-services.json` בריפו
+- [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
 - [ ] שלב 3: התראות. לפרוס גם את `functions/` (היום ה־CI לא פורס Functions; לא ידוע אם הפונקציה רצה בפרודקשן)
 - [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
 
@@ -28,7 +29,8 @@
 - כניסה: חשבון Google.
 - הווב (PWA) נשאר, מאותו קוד.
 - זיהוי תשלומים אוטומטי (התראות Wallet/אשראי, Gmail): שלב 8, עתידי.
-- פונט: Rubik או Fredoka, לפי הבחירה בפרוטוטייפ.
+- פונט: Rubik.
+- **כיוון עיצוב (משוב על הפרוטוטייפ):** הפרקטיקה בפרונט. הוספת הוצאה ומעקב זמינים מיד במסך הראשי, בלי עומס של סטטיסטיקות ומידע. ניתוח ונתונים רק במקום משני ומצומצם.
 - `nextDate` נשאר עוגן ולא נכתב מחדש. כל התצוגות מחשבות את המופע הבא.
 
 ## חתימת Android
