@@ -6,7 +6,7 @@ import { Icon, ServiceBubble, Sheet } from './components.jsx';
 import { fmtMoney, getService } from './data.jsx';
 import { Spinner } from './feedback.jsx';
 import { detectSupported, isAlreadyRecorded, listSuggestions, onDetectEvent, removeSuggestions, suggestionToItem } from './lib/detect.js';
-import { scanGmail, silentGmailToken } from './lib/gmail.js';
+import { gmailScanNow, scanGmail, serviceForDomain, setGmailAutoScan } from './lib/gmail.js';
 import { haptic, isNative } from './lib/platform.js';
 import { CategoryBadge } from './ui/icons.jsx';
 import { Card } from './ui/kit.jsx';
@@ -124,14 +124,13 @@ function trackedBy(subs) {
   return (r) => (r.serviceId && ids.has(r.serviceId)) || names.has((r.merchant || '').toLowerCase());
 }
 
-// ---------- Automatic Gmail scan (Android) ----------
-// After the first manual scan, the app checks Gmail by itself whenever it
-// opens (at most every few hours) with a silent token, and new receipts join
-// the "זוהו תשלומים" card next to the Wallet ones.
+// ---------- Automatic Gmail check (Android) ----------
+// After the first manual scan the phone checks Gmail by itself, hourly and
+// whenever the app opens, also with the app closed (GmailReceiptScanner). New
+// receipts land in the native inbox next to the Wallet ones, with a
+// notification. The local inbox below only holds receipts found before that.
 const AUTO_KEY = 'gmail-auto';
 const INBOX_KEY = 'gmail-inbox-v1';
-const LAST_KEY = 'gmail-last-scan';
-const AUTO_EVERY_MS = 4 * 3600 * 1000;
 const store = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
@@ -139,34 +138,22 @@ const store = {
 
 function useGmailInbox({ enabled, items, subs }) {
   const [inbox, setInbox] = React.useState(() => store.get(INBOX_KEY, []));
-  const ctx = React.useRef({ items, subs });
-  ctx.current = { items, subs };
-
-  const run = React.useCallback(async (force = false) => {
-    if (!isNative || !store.get(AUTO_KEY, false)) return;
-    if (!force && Date.now() - store.get(LAST_KEY, 0) < AUTO_EVERY_MS) return;
-    const token = await silentGmailToken();
-    if (!token) return;
-    try {
-      const { receipts } = await scanGmail({ days: 30, max: 40, token });
-      store.set(LAST_KEY, Date.now());
-      const handled = loadHandled();
-      setInbox((prev) => {
-        const known = new Set(prev.map((r) => r.id));
-        const fresh = receipts.filter((r) => !known.has(r.id) && !handled.has(r.id));
-        const next = [...fresh, ...prev].slice(0, 40);
-        store.set(INBOX_KEY, next);
-        return next;
-      });
-    } catch (e) { console.error('auto gmail scan failed', e); }
-  }, []);
+  const [auto, setAutoState] = React.useState(() => store.get(AUTO_KEY, false));
 
   React.useEffect(() => {
-    if (!enabled || !isNative) return undefined;
-    run();
-    const h = CapApp.addListener('resume', () => run());
+    if (!enabled || !isNative || !auto) return undefined;
+    // Schedules the hourly check (idempotent) and refreshes its query.
+    setGmailAutoScan(true).then(() => gmailScanNow()).catch(() => {});
+    const h = CapApp.addListener('resume', () => { gmailScanNow().catch(() => {}); });
     return () => { h.then((x) => x.remove()); };
-  }, [enabled, run]);
+  }, [enabled, auto]);
+
+  const setAuto = React.useCallback(async (on) => {
+    store.set(AUTO_KEY, on);
+    setAutoState(on);
+    await setGmailAutoScan(on).catch(() => {});
+    if (on) gmailScanNow(true).catch(() => {});
+  }, []);
 
   const remove = React.useCallback((ids) => {
     const handled = loadHandled();
@@ -177,8 +164,10 @@ function useGmailInbox({ enabled, items, subs }) {
 
   // Hide what got recorded or tracked meanwhile (also on another device).
   const isTracked = trackedBy(subs);
-  const suggestions = inbox.filter((r) => !isTracked(r) && !isAlreadyRecorded(r, items));
-  return { suggestions, remove, enableAuto: () => store.set(AUTO_KEY, true) };
+  const isRelevant = (r) => r.source !== 'gmail'
+    || (!isTracked({ ...r, serviceId: r.serviceId || serviceForDomain(r.domain) }) && !isAlreadyRecorded(r, items));
+  const suggestions = inbox.filter(isRelevant);
+  return { suggestions, remove, isRelevant, auto, setAuto, enableAuto: () => setAuto(true) };
 }
 
 const CYCLE_HE = { monthly: 'לחודש', yearly: 'לשנה' };
@@ -186,7 +175,7 @@ const CYCLE_HE = { monthly: 'לחודש', yearly: 'לשנה' };
 function gmailError(e) {
   if (e?.code === 'gmail/api-disabled') return 'הגישה ל־Gmail עוד לא הופעלה בפרויקט. זה בטיפול.';
   if (e?.code === 'gmail/forbidden' || e?.code === 'auth/user-cancelled' || /access_denied|denied|12501|blocked/i.test(e?.message || '')) {
-    return 'Google חסמה את הגישה ל־Gmail. צריך לפרסם את האפליקציה (Publish app) במסך ההרשאות ב־Google Cloud.';
+    return 'Google עצרה את הגישה ל־Gmail. אם מופיע "Google לא אימתה את האפליקציה": "מתקדם" ← "מעבר ל־schedual-fdde7", ואז לאשר.';
   }
   if (e?.code === 'auth/popup-closed-by-user' || /cancel/i.test(e?.message || '')) return 'הכניסה בוטלה.';
   if (e?.code === 'auth/user-mismatch') return 'צריך לבחור את אותו חשבון Google שמחובר לאפליקציה.';

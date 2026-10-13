@@ -38,7 +38,7 @@ public final class DetectNotifier {
     private static void ensureChannel(Context c) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationChannel ch = new NotificationChannel(CHANNEL, "תשלומים שזוהו", NotificationManager.IMPORTANCE_DEFAULT);
-        ch.setDescription("הצעה להוסיף תשלום שזוהה מ־Wallet או מכרטיס האשראי");
+        ch.setDescription("הצעה להוסיף תשלום שזוהה מ־Wallet, מכרטיס האשראי או מקבלה במייל");
         c.getSystemService(NotificationManager.class).createNotificationChannel(ch);
     }
 
@@ -55,7 +55,7 @@ public final class DetectNotifier {
             .setSmallIcon(R.drawable.ic_stat_notify)
             .setColor(0xFF22A45D)
             .setContentTitle(title)
-            .setContentText("להוסיף להוצאות?")
+            .setContentText("gmail".equals(s.optString("source")) ? "קבלה במייל · להוסיף להוצאות?" : "להוסיף להוצאות?")
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setContentIntent(activity(c, "open", id, nid))

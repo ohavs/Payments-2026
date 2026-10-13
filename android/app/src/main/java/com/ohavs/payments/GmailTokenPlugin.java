@@ -1,49 +1,54 @@
 package com.ohavs.payments;
 
-import android.content.Context;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.UserRecoverableAuthException;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.common.api.Scope;
+import com.ohavs.payments.detect.GmailAccess;
+import com.ohavs.payments.detect.GmailReceiptScanner;
 
 /**
- * Gmail read access without any UI, once the user has granted it: lets the
- * app scan receipts in the background on launch. Returns no token (and a
- * reason) when the grant is missing or has to be confirmed again, so the app
- * falls back to the interactive flow.
+ * Gmail read access without any UI, once the user has granted it, and the
+ * background receipt check: after the first manual scan, new receipts pop up
+ * as "₪61.90 · וולט — להוסיף?" even when the app is closed.
  */
 @CapacitorPlugin(name = "GmailToken")
 public class GmailTokenPlugin extends Plugin {
-    private static final String SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
     @PluginMethod
     public void silentToken(PluginCall call) {
         getBridge().execute(() -> {
+            GmailAccess.Result r = GmailAccess.silentToken(getContext());
             JSObject ret = new JSObject();
-            try {
-                Context ctx = getContext();
-                GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(ctx);
-                if (account == null || account.getAccount() == null) {
-                    ret.put("reason", "no-account");
-                } else if (!GoogleSignIn.hasPermissions(account, new Scope(SCOPE))) {
-                    ret.put("reason", "no-permission");
-                } else {
-                    ret.put("token", GoogleAuthUtil.getToken(ctx, account.getAccount(), "oauth2:" + SCOPE));
-                    ret.put("email", account.getEmail());
-                }
-            } catch (UserRecoverableAuthException e) {
-                ret.put("reason", "consent");
-            } catch (Exception e) {
-                ret.put("reason", "error");
-                ret.put("message", String.valueOf(e.getMessage()));
+            if (r.token != null) {
+                ret.put("token", r.token);
+                ret.put("email", r.email);
+            } else {
+                ret.put("reason", r.reason);
+                if (r.message != null) ret.put("message", r.message);
             }
+            call.resolve(ret);
+        });
+    }
+
+    /** { enabled, query }: turns the hourly background check on or off. */
+    @PluginMethod
+    public void setAutoScan(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        GmailReceiptScanner.setEnabled(getContext(), on, call.getString("query", ""));
+        JSObject ret = new JSObject();
+        ret.put("enabled", GmailReceiptScanner.isEnabled(getContext()));
+        call.resolve(ret);
+    }
+
+    /** Checks now (app opened or resumed), unless it ran in the last few minutes. */
+    @PluginMethod
+    public void scanNow(PluginCall call) {
+        boolean force = Boolean.TRUE.equals(call.getBoolean("force", false));
+        getBridge().execute(() -> {
+            JSObject ret = new JSObject();
+            ret.put("added", GmailReceiptScanner.scan(getContext(), force));
             call.resolve(ret);
         });
     }

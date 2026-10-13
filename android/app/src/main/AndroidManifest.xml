@@ -38,6 +38,11 @@
         <receiver
             android:name=".detect.DismissReceiver"
             android:exported="false" />
+        <!-- Gmail receipts: hourly check in the background once the user turned it on. -->
+        <service
+            android:name=".detect.GmailReceiptJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -57,4 +62,6 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Reminders and detected-payment prompts (Android 13+ asks the user). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the Gmail receipt check scheduled after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 </manifest>

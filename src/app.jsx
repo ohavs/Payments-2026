@@ -193,17 +193,17 @@ function AppInner() {
       toast(added.length === 1 ? `נוספה הוצאה · ${fmtMoney(added[0].amount)} · ${added[0].title}` : `נוספו ${added.length} הוצאות`, { type: 'success' });
     } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
-  // Wallet / card suggestions live on the phone; Gmail ones in the Gmail inbox.
+  // Wallet / card suggestions live on the phone; Gmail ones from before the
+  // background check in the Gmail inbox.
   const removeSuggestions = (ids) => {
     const gmail = ids.filter((id) => String(id).startsWith('gmail:'));
     const native = ids.filter((id) => !String(id).startsWith('gmail:'));
-    if (gmail.length) gmailInbox.remove(gmail);
+    // Gmail receipts from the background check sit in the native inbox too.
+    if (gmail.length) { gmailInbox.remove(gmail); detected.remove(gmail); }
     if (native.length) detected.remove(native);
   };
-  const allSuggestions = useMemo(
-    () => [...detected.suggestions, ...gmailInbox.suggestions].sort((a, b) => (b.time || 0) - (a.time || 0)),
-    [detected.suggestions, gmailInbox.suggestions]
-  );
+  const allSuggestions = [...detected.suggestions.filter(gmailInbox.isRelevant), ...gmailInbox.suggestions]
+    .sort((a, b) => (b.time || 0) - (a.time || 0));
   const editSuggestion = (s) => {
     haptic('tap'); setQuickCategory(null); setQuickPrefill({ ...toItem(s), suggestionId: s.id }); setQuickOpen(true);
   };
@@ -301,6 +301,8 @@ function AppInner() {
               onSignOut={handleSignOut}
               onOpenUpdates={() => setUpdateOpen(true)}
               onOpenGmail={() => setGmailOpen(true)}
+              gmailAuto={gmailInbox.auto}
+              onGmailAuto={gmailInbox.setAuto}
             />
           )}
         </main>

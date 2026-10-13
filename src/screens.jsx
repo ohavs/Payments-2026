@@ -11,6 +11,7 @@ import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNoti
 import { ListCard, SectionHeader } from './payment-card.jsx';
 import { ensureNativeNotifPermission, nativeNotifPermission, sendNativeTestNotification } from './lib/reminders.js';
 import { detectStatus, openDetectAccess, setDetectEnabled } from './lib/detect.js';
+import { silentGmailToken } from './lib/gmail.js';
 import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
@@ -303,7 +304,7 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 }
 
 // ---------- SETTINGS ----------
-function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates, onOpenGmail }) {
+function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates, onOpenGmail, gmailAuto, onGmailAuto }) {
   const [version, setVersion] = useState(null);
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
@@ -350,6 +351,14 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       setTimeout(() => openDetectAccess(), 700);
     }
   };
+  // Gmail in the background: needs the read access from a first manual scan.
+  const toggleGmailAuto = async (on) => {
+    if (!on) { onGmailAuto(false); return; }
+    if (!(await silentGmailToken())) { toast('סריקה ראשונה מאשרת את הגישה ל־Gmail', { type: 'info' }); onOpenGmail(); return; }
+    if ((await ensureNativeNotifPermission()) !== 'granted') toast('בלי הרשאת התראות הקבלות יופיעו רק באפליקציה', { type: 'info' });
+    onGmailAuto(true);
+  };
+
   const detectSub = !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
     : detect.access ? 'פעיל · תשלום חדש יופיע כהצעה' : 'צריך לאשר גישה להתראות';
 
@@ -519,6 +528,11 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
           {!isAnon && (
             <Row icon="download" tint="var(--sky)" label="קבלות מ־Gmail" sub="מנויים וקניות מהמייל"
               onClick={onOpenGmail} right={chevron} />
+          )}
+          {isNative && !isAnon && (
+            <Row icon="bell" tint="var(--peach)" label="קבלה חדשה במייל"
+              sub={gmailAuto ? 'נבדק כל שעה · קופצת התראה להוספה' : 'התראה על כל קבלה חדשה'}
+              right={<Toggle checked={!!gmailAuto} onChange={toggleGmailAuto} />} />
           )}
         </SettingsGroup>
       )}

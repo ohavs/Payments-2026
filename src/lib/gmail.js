@@ -44,6 +44,17 @@ export async function silentGmailToken() {
   } catch (e) { return null; }
 }
 
+// Android background check (GmailReceiptScanner): hourly, also with the app
+// closed; new receipts join the Wallet suggestions with a "להוסיף?" notification.
+export async function setGmailAutoScan(enabled) {
+  if (!isNative) return { enabled: false };
+  return GmailToken.setAutoScan({ enabled, query: receiptQuery(3) });
+}
+export async function gmailScanNow(force = false) {
+  if (!isNative) return { added: 0 };
+  return GmailToken.scanNow({ force });
+}
+
 export async function getGmailToken() {
   if (cached && cached.until > Date.now()) return cached.token;
   let token = null;
