@@ -1,5 +1,8 @@
 // Payment card components — the visual heart of the app.
 // StatsCard (the yellow stats card on home) + ListCard (compact row).
+import { useMemo } from 'react';
+import { Icon, ServiceBubble } from './components.jsx';
+import { CYCLE_LABEL, CYCLE_ORDER, countsPerCycle, fmtMoney, fmtRelative, isAutoPaid, resolveService, totalsByMonthlyEquivalent } from './data.jsx';
 
 function StatsCard({ paid, planned, count, onClick }) {
   const pct = planned > 0 ? Math.min(100, Math.round(paid / planned * 100)) : 0;
@@ -249,4 +252,4 @@ function SectionHeader({ title, count, total, action, onAction, collapsible, col
   );
 }
 
-Object.assign(window, { StatsCard, TotalsCard, ListCard, SectionHeader });
+export { ListCard, SectionHeader, StatsCard, TotalsCard };

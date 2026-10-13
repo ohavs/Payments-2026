@@ -2,6 +2,9 @@
 // like a single "package" with continuous left/right edges (per user reference).
 // Rows are flush, separated only by a subtle horizontal divider.
 // Tap a row → it expands inline; tap again or wait 3s → collapses.
+import React, { useEffect, useRef, useState } from 'react';
+import { Icon, ServiceBubble } from './components.jsx';
+import { CYCLE_LABEL, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, resolveService } from './data.jsx';
 
 const AUTO_COLLAPSE_MS = 3000;
 
@@ -194,4 +197,4 @@ function Stat({ label, value }) {
   );
 }
 
-Object.assign(window, { StackedPaymentList, PaymentRow });
+export { PaymentRow, StackedPaymentList };

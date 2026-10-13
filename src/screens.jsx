@@ -1,4 +1,14 @@
 // Main screens: Home, Calendar, Settings
+import React, { useMemo, useState } from 'react';
+import { BudgetDetailSheet, BudgetHeroCard, BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from './budget.jsx';
+import { Chip, Icon, IconButton, Row, Sheet, Toggle } from './components.jsx';
+import { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, isAutoPaid, monthlyEquivalent, parseISODate, resolveService, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
+import { Spinner, useToast } from './feedback.jsx';
+import { useExchangeRates } from './fx.jsx';
+import { DEFAULT_CATEGORIES, ExpenseListSection, MONTH_NAMES_HE, PendingInvitesCard, useLists } from './lists.jsx';
+import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNotification } from './notifications.jsx';
+import { ListCard, SectionHeader, TotalsCard } from './payment-card.jsx';
+import { StackedPaymentList } from './stacked-list.jsx';
 
 // ---------- Swipeable stats carousel (One UI-style widget pager) ----------
 function StatsCarousel({ pages }) {
@@ -927,4 +937,4 @@ function SettingsGroup({ title, children }) {
   );
 }
 
-Object.assign(window, { HomeScreen, SubscriptionsScreen, CalendarScreen, SettingsScreen, ScreenTitle });
+export { CalendarScreen, HomeScreen, ScreenTitle, SettingsScreen, SubscriptionsScreen };

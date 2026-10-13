@@ -1,4 +1,6 @@
 // Toast + Confirm dialog + Full-screen loader — custom-styled, no native alert/confirm.
+import React from 'react';
+import { Icon } from './components.jsx';
 
 const ToastContext = React.createContext({ show: () => {} });
 const ConfirmContext = React.createContext({ confirm: () => Promise.resolve(false) });
@@ -178,4 +180,4 @@ function Spinner({ size = 16, color = 'currentColor' }) {
   );
 }
 
-Object.assign(window, { FeedbackProvider, useToast, useConfirm, FullScreenLoader, Spinner });
+export { FeedbackProvider, FullScreenLoader, Spinner, useConfirm, useToast };

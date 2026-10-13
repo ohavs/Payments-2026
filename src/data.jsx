@@ -1,5 +1,7 @@
 // Catalog of popular Israeli services for the "add" picker.
 // Each entry: id, name (Hebrew), category, defaultPrice (NIS), defaultCycle, brand color, glyph
+import { convertCurrency } from './fx.jsx';
+
 const SERVICE_CATALOG = [
   // Streaming
   { id: 'netflix',    name: 'Netflix',         cat: 'streaming', price: 54.90,  cycle: 'monthly', bg: '#E50914', fg: '#fff',     glyph: 'N' },
@@ -250,7 +252,7 @@ const CYCLE_PER_MONTH = { yearly: 1 / 12, monthly: 1, weekly: 30 / 7, daily: 30 
 function priceIn(payment, rates, target) {
   const p = Number(payment.price || 0);
   if (!rates || !target || !payment.currency || payment.currency === target) return p;
-  return window.convertCurrency ? window.convertCurrency(p, payment.currency, target, rates) : p;
+  return convertCurrency(p, payment.currency, target, rates);
 }
 
 function monthlyEquivalent(payment, rates, target) {
@@ -273,15 +275,4 @@ function countsPerCycle(payments) {
   return c;
 }
 
-Object.assign(window, {
-  SERVICE_CATALOG, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, ACCENT_PALETTE,
-  seedPayments, getService, resolveService, isAutoPaid,
-  paidThisMonth, plannedThisMonth,
-  fmtMoney, daysUntil, fmtDateShort, fmtRelative, parseISODate,
-  nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay,
-  dayOfMonthFromDate, dayOfWeekFromDate, monthFromDate,
-  lastDayOfMonth, fmtLocalISO, todayLocalISO,
-  MONTH_NAMES_SHORT, MONTH_NAMES_LONG,
-  priceIn, monthlyEquivalent, totalsByMonthlyEquivalent, totalsPerCycle, countsPerCycle,
-  CYCLE_PER_MONTH,
-});
+export { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, countsPerCycle, dayOfMonthFromDate, dayOfWeekFromDate, daysUntil, fmtDateShort, fmtLocalISO, fmtMoney, fmtRelative, getService, isAutoPaid, lastDayOfMonth, monthFromDate, monthlyEquivalent, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, paidThisMonth, parseISODate, plannedThisMonth, priceIn, resolveService, seedPayments, todayLocalISO, totalsByMonthlyEquivalent, totalsPerCycle };

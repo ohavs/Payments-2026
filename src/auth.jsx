@@ -1,4 +1,6 @@
 // Login screen — Google primary, anonymous fallback.
+import React from 'react';
+import { Spinner, useToast } from './feedback.jsx';
 
 function LoginScreen({ onSignInGoogle, onSignInAnonymous }) {
   const [busy, setBusy] = React.useState(null); // 'google' | 'anon' | null
@@ -93,4 +95,4 @@ function GoogleLogo() {
   );
 }
 
-Object.assign(window, { LoginScreen });
+export { LoginScreen };

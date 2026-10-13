@@ -7,6 +7,12 @@
 //
 // Reuses helpers from lists.jsx (expenseDate, localISO, MONTH_NAMES_HE,
 // FieldInput, Label, PrimaryButton, Section, ghostBtn) and data.jsx (fmtMoney).
+import React from 'react';
+import { Chip, Icon, IconButton, Sheet, Toggle } from './components.jsx';
+import { fmtMoney, totalsByMonthlyEquivalent } from './data.jsx';
+import { useToast } from './feedback.jsx';
+import { useExchangeRates } from './fx.jsx';
+import { FieldInput, PrimaryButton, Section, expenseDate, ghostBtn, useStickyState } from './lists.jsx';
 
 // Clamp a number into [lo, hi].
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
@@ -624,7 +630,4 @@ function BudgetSettingsSheet({ open, onClose, settings, setSettings, categories,
   );
 }
 
-Object.assign(window, {
-  PaceChips, MiniTile, computeBudgetStats, useSubsMonthly, ProgressRing, BudgetHeroCard,
-  BudgetDetailSheet, BudgetSettingsSheet, DailyBars, MeterRow, StatTile, budgetColor,
-});
+export { BudgetDetailSheet, BudgetHeroCard, BudgetSettingsSheet, DailyBars, MeterRow, MiniTile, PaceChips, ProgressRing, StatTile, budgetColor, computeBudgetStats, useSubsMonthly };

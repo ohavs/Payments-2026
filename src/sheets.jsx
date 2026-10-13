@@ -1,4 +1,8 @@
 // Detail sheet, Add Service sheet, and Custom Service builder.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Chip, Icon, IconButton, ServiceBubble, Sheet } from './components.jsx';
+import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, resolveService, todayLocalISO } from './data.jsx';
+import { Spinner, useConfirm, useToast } from './feedback.jsx';
 
 // ---------- Day-of-cycle picker ----------
 // Replaces the absolute-date input. The user picks a recurrence day; we
@@ -795,4 +799,4 @@ function EditCustomSheet({ payment, open, onClose, onSave }) {
   );
 }
 
-Object.assign(window, { DetailSheet, AddSheet, EditCustomSheet, EditField, CustomServiceBuilder });
+export { AddSheet, CustomServiceBuilder, DetailSheet, EditCustomSheet, EditField };

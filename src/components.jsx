@@ -1,5 +1,5 @@
 // Shared UI atoms for the payments app
-const { useState, useEffect, useRef, useMemo } = React;
+import React, { useEffect, useRef, useState } from 'react';
 
 // Brand glyph for a service (logo bubble). Size in px.
 function ServiceBubble({ service, size = 44, dark = false }) {
@@ -288,4 +288,4 @@ function Row({ icon, label, sub, right, onClick, danger }) {
   );
 }
 
-Object.assign(window, { ServiceBubble, Icon, Chip, IconButton, Sheet, Toggle, Row });
+export { Chip, Icon, IconButton, Row, ServiceBubble, Sheet, Toggle };

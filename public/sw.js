@@ -26,25 +26,12 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-const VERSION = 'v24';
+const VERSION = 'v25';
+// Built JS/CSS live under /assets/ with content hashes, so the shell only needs
+// the entry page; everything else is cached as it is fetched.
 const APP_SHELL = [
   '/',
-  '/payments.html',
-  '/app.jsx',
-  '/components.jsx',
-  '/data.jsx',
-  '/firebase-init.jsx',
-  '/feedback.jsx',
-  '/fx.jsx',
-  '/notifications.jsx',
-  '/auth.jsx',
-  '/payment-card.jsx',
-  '/screens.jsx',
-  '/sheets.jsx',
-  '/stacked-list.jsx',
-  '/lists.jsx',
-  '/budget.jsx',
-  '/tweaks-panel.jsx',
+  '/index.html',
   '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -72,7 +59,7 @@ self.addEventListener('notificationclick', (event) => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const existing = all.find((c) => c.url.includes(self.location.origin));
     if (existing) { await existing.focus(); return; }
-    await self.clients.openWindow('/payments.html');
+    await self.clients.openWindow('/');
   })());
 });
 
@@ -106,9 +93,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin — NETWORK FIRST, BYPASSING the browser HTTP cache so a Firebase
-  // Hosting Cache-Control header can't keep serving stale .jsx after a deploy.
-  // Fall back to the SW cache only if the network actually fails (offline).
+  // Hashed build assets never change: cache first.
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(VERSION).then((c) => c.put(req, clone));
+        }
+        return res;
+      }))
+    );
+    return;
+  }
+
+  // Everything else same-origin — NETWORK FIRST, BYPASSING the browser HTTP
+  // cache so a deploy is picked up immediately. Fall back to the SW cache only
+  // if the network actually fails (offline).
   event.respondWith(
     fetch(req, { cache: 'no-store' }).then((res) => {
       if (res.ok) {
@@ -119,8 +120,8 @@ self.addEventListener('fetch', (event) => {
     }).catch(() => caches.match(req).then((hit) => {
       if (hit) return hit;
       // Only fall back to the HTML shell for page navigations. Never serve HTML
-      // in place of a missing .jsx/asset — that would execute as JS and crash.
-      if (req.mode === 'navigate') return caches.match('/payments.html');
+      // in place of a missing script/asset — that would execute as JS and crash.
+      if (req.mode === 'navigate') return caches.match('/index.html');
       return Response.error();
     }))
   );

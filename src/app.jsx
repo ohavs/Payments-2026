@@ -1,5 +1,13 @@
 // Main app shell — auth gate, state, theme, navigation, mounts screens & sheets.
-const { useState: _useState4, useEffect: _useEffect4, useMemo: _useMemo4 } = React;
+import React, { useEffect, useState } from 'react';
+import { LoginScreen } from './auth.jsx';
+import { Icon } from './components.jsx';
+import { FeedbackProvider, FullScreenLoader, useConfirm, useToast } from './feedback.jsx';
+import { useAuthUser, useFirebaseSettings, usePayments } from './firebase-init.jsx';
+import { CalendarScreen, HomeScreen, SettingsScreen, SubscriptionsScreen } from './screens.jsx';
+import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
+import { TweakColor, TweakRadio, TweakSection, TweaksPanel, useTweaks } from './tweaks-panel.jsx';
+import { notifPermission, registerFcmToken, scanForReminders } from './notifications.jsx';
 
 function AppInner() {
   const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
@@ -47,15 +55,15 @@ function AppInner() {
   // On payments/settings change, scan for upcoming reminders
   useEffect(() => {
     if (!user || paymentsLoading || settingsLoading) return;
-    window.scanForReminders?.(payments, settings);
+    scanForReminders(payments, settings);
   }, [user?.uid, payments.length, settings?.notif, settingsLoading, paymentsLoading]);
 
   // Re-register FCM token on app load if notification permission is already granted
   // (handles new device, token expiry, etc.)
   useEffect(() => {
     if (!user || settingsLoading) return;
-    if (window.notifPermission?.() === 'granted') {
-      window.registerFcmToken?.(user.uid);
+    if (notifPermission() === 'granted') {
+      registerFcmToken(user.uid);
     }
   }, [user?.uid, settingsLoading]);
 
@@ -223,4 +231,4 @@ function BottomNav({ tab, setTab, onAdd }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+export { App };

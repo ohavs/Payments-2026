@@ -10,6 +10,13 @@
 // Sharing: invite another Google account by its email (invitedEmails) — the
 // invitee sees the invitation in-app and accepts it themselves. The list id also
 // works as an unguessable invite code. Both are enforced in firestore.rules.
+import React from 'react';
+import firebase from './lib/firebase.js';
+import { Chip, Icon, IconButton, Sheet } from './components.jsx';
+import { fmtMoney, parseISODate } from './data.jsx';
+import { Spinner, useConfirm, useToast } from './feedback.jsx';
+import { fbAuth, fbDb } from './firebase-init.jsx';
+import { SectionHeader } from './payment-card.jsx';
 
 const DEFAULT_CATEGORIES = ['קניות', 'ביטוחים', 'אוכל בחוץ', 'שונות'];
 const MONTH_NAMES_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
@@ -60,7 +67,7 @@ function useLists(uid, user) {
   const myEmail = (user?.email || '').trim().toLowerCase();
 
   React.useEffect(() => {
-    if (!uid || !window.fbDb) { setLists([]); setLoading(false); return; }
+    if (!uid) { setLists([]); setLoading(false); return; }
     setLoading(true);
     const unsub = fbDb.collection('lists')
       .where('members', 'array-contains', uid)
@@ -76,7 +83,7 @@ function useLists(uid, user) {
   // Trackers someone invited this Google account to. Readable thanks to the
   // invitedEmails rule, so an invitation shows up without any server code.
   React.useEffect(() => {
-    if (!uid || !myEmail || !window.fbDb) { setInvites([]); return; }
+    if (!uid || !myEmail) { setInvites([]); return; }
     const unsub = fbDb.collection('lists')
       .where('invitedEmails', 'array-contains', myEmail)
       .onSnapshot((snap) => {
@@ -109,7 +116,7 @@ function useLists(uid, user) {
   }, [lists, activeListId]);
 
   React.useEffect(() => {
-    if (!activeListId || !window.fbDb) { setItems([]); return; }
+    if (!activeListId) { setItems([]); return; }
     const unsub = fbDb.collection('lists').doc(activeListId).collection('items')
       .onSnapshot((snap) => {
         const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -758,7 +765,7 @@ function ManageExpensesSheet({ open, onClose, lists }) {
   const toast = useToast();
   const confirm = useConfirm();
 
-  const user = window.fbAuth?.currentUser;
+  const user = fbAuth.currentUser;
   const isOwner = activeList && user && activeList.ownerUid === user.uid;
   const categories = activeList?.groups || [];
 
@@ -962,7 +969,4 @@ const ghostBtn = {
   background: 'var(--surface-3)', color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 13.5,
 };
 
-Object.assign(window, {
-  useLists, ExpenseListSection, PendingInvitesCard, AddExpenseSheet, EditExpenseSheet, ManageExpensesSheet,
-  expenseDate, localISO, todayISO, MONTH_NAMES_HE, DEFAULT_CATEGORIES,
-});
+export { AddExpenseSheet, DEFAULT_CATEGORIES, EditExpenseSheet, ExpenseListSection, FieldInput, MONTH_NAMES_HE, ManageExpensesSheet, PendingInvitesCard, PrimaryButton, Section, expenseDate, ghostBtn, localISO, todayISO, useLists, useStickyState };

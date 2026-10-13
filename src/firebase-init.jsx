@@ -3,9 +3,11 @@
 // Schema:
 //   users/{uid}/settings/main        — single settings document
 //   users/{uid}/payments/{paymentId} — one document per tracked payment
+import React from 'react';
+import firebase from './lib/firebase.js';
 
-const fbAuth = window.firebase ? firebase.auth() : null;
-const fbDb = window.firebase ? firebase.firestore() : null;
+const fbAuth = firebase.auth();
+const fbDb = firebase.firestore();
 
 // Enable persistence (offline cache + PWA reliability). Failures are non-fatal
 // (multi-tab still works; we just don't get the persistent cache).
@@ -129,4 +131,4 @@ function useFirebaseSettings(uid, fallbackName) {
   return [settings, setSettings, { loading }];
 }
 
-Object.assign(window, { fbAuth, fbDb, useAuthUser, usePayments, useFirebaseSettings });
+export { fbAuth, fbDb, useAuthUser, useFirebaseSettings, usePayments };

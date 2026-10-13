@@ -1,6 +1,9 @@
 // Notifications — permission, test, FCM token registration, reminder scan.
 // Cloud Functions handle scheduled push (via FCM) when the app is closed;
 // the on-load scanner here covers in-session reminders too.
+import firebase, { FCM_VAPID_KEY } from './lib/firebase.js';
+import { fmtMoney, parseISODate, resolveService } from './data.jsx';
+import { fbDb } from './firebase-init.jsx';
 
 const NOTIF_TIMING_DAYS = { week: 7, three: 3, day: 1, same: 0 };
 
@@ -48,11 +51,11 @@ function scanForReminders(payments, settings) {
       if (diff === NOTIF_TIMING_DAYS[timing]) {
         const key = `${p.id}:${stamp}:${timing}`;
         if (seen[key]) return;
-        const svc = window.resolveService ? window.resolveService(p) : null;
+        const svc = resolveService(p);
         const when = diff === 0 ? 'היום' : diff === 1 ? 'מחר' : `בעוד ${diff} ימים`;
         showLocalNotification(
           `תזכורת תשלום: ${svc?.name || 'תשלום'}`,
-          `${when} · ${window.fmtMoney ? window.fmtMoney(p.price, p.currency) : p.price}`,
+          `${when} · ${fmtMoney(p.price, p.currency)}`,
           { tag: key }
         );
         seen[key] = Date.now();
@@ -72,13 +75,13 @@ function scanForReminders(payments, settings) {
 async function registerFcmToken(uid) {
   if (!uid) return null;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null;
-  if (!window.firebase?.messaging || !window.FCM_VAPID_KEY) return null;
+  if (!firebase.messaging.isSupported()) return null;
   try {
     const reg = await navigator.serviceWorker?.ready;
     if (!reg) return null;
     const messaging = firebase.messaging();
     const token = await messaging.getToken({
-      vapidKey: window.FCM_VAPID_KEY,
+      vapidKey: FCM_VAPID_KEY,
       serviceWorkerRegistration: reg,
     });
     if (!token) return null;
@@ -96,4 +99,4 @@ async function registerFcmToken(uid) {
   }
 }
 
-Object.assign(window, { notifPermission, ensureNotifPermission, showLocalNotification, scanForReminders, registerFcmToken });
+export { ensureNotifPermission, notifPermission, registerFcmToken, scanForReminders, showLocalNotification };

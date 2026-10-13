@@ -1,5 +1,6 @@
 // Currency conversion — fetch FX rates from a free no-key API once per day,
 // cache in localStorage, expose a React hook + pure converter for stats math.
+import React from 'react';
 
 const FX_CACHE_KEY = 'fx-rates-v1';
 const FX_API = 'https://open.er-api.com/v6/latest/ILS';
@@ -53,4 +54,4 @@ function useExchangeRates() {
   return state; // { rates, fetchedAt, fromCache, fallback }
 }
 
-Object.assign(window, { fetchRates, convertCurrency, useExchangeRates, symbolToCode });
+export { convertCurrency, fetchRates, symbolToCode, useExchangeRates };
