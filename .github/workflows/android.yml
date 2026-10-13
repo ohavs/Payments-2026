@@ -130,7 +130,7 @@ jobs:
           set -euo pipefail
           LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
           SHIPPED="src public index.html android package.json package-lock.json capacitor.config.json"
-          if [ -n "$LAST" ] && git diff --quiet "$LAST" HEAD -- $SHIPPED; then
+          if [ -n "$LAST" ] && git diff --quiet "$LAST" HEAD -- $SHIPPED ':(exclude)src/**/*.test.js'; then
             echo "Nothing in the app changed since $LAST; no release."; exit 0
           fi
           if [ -z "$LAST" ] || ! git diff --quiet "$LAST" HEAD -- release-notes.md; then

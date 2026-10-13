@@ -10,7 +10,7 @@ const ApkUpdater = registerPlugin('ApkUpdater');
 const REPO = 'ohavs/Payments-2026';
 const LAST_CHECK_KEY = 'update-last-check';
 
-function parseRelease(rel) {
+export function parseRelease(rel) {
   const m = /<!--\s*update\s*(\{[\s\S]*?\})\s*-->/.exec(rel.body || '');
   if (!m) return null;
   const meta = JSON.parse(m[1]);

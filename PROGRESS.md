@@ -17,9 +17,12 @@
   - CI על כל ענף. הפריסה מריצה lint, בדיקות ו־build, ואחרי הפריסה בדיקת smoke על האתר החי
 
 ## הבא
-- [ ] שלב 2: Capacitor + Android, כניסת Google נייטיב, APK חתום ב־GitHub Releases, "בדוק עדכונים" באפליקציה (בעבודה)
-  - [x] פרויקט Android, אייקון ו־splash, חתימה, `android.yml`, בדיקת emulator
-  - [x] אפליקציית Android רשומה ב־Firebase (`1:267719533646:android:18a498064f979005734f1f`) עם SHA, `google-services.json` בריפו
+- [x] שלב 2: אפליקציית Android (Capacitor 8). Release ראשון: v2.0.4 https://github.com/ohavs/Payments-2026/releases/latest
+  - כניסת Google נייטיב, כפתור חזור, edge-to-edge, אייקון ו־splash
+  - "בדוק עדכונים" בהגדרות + באנר בפתיחה. הורדה, בדיקת SHA-256, מתקין אנדרואיד
+  - `android.yml`: APK חתום, בדיקת חתימה, הרצה על emulator (מסך הכניסה עולה), Release רק מהענף המוגש ורק כשמשהו באפליקציה השתנה. ההערות ב־`release-notes.md`
+  - אפליקציית Android רשומה ב־Firebase (`1:267719533646:android:18a498064f979005734f1f`) עם SHA, `google-services.json` בריפו
+  - טרם נבדק במכשיר אמיתי: כניסת Google ועדכון בפועל (מחכה למשתמש)
 - [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
 - [ ] שלב 3: התראות. לפרוס גם את `functions/` (היום ה־CI לא פורס Functions; לא ידוע אם הפונקציה רצה בפרודקשן)
 - [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
@@ -40,4 +43,4 @@
 
 ## סודות (שמות בלבד)
 - `FIREBASE_SERVICE_ACCOUNT`: קיים (פריסה)
-- `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`: נמסרו למשתמש להוספה (שלב 2)
+- `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`: קיימים
