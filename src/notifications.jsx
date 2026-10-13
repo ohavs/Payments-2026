@@ -5,6 +5,7 @@ import firebase, { FCM_VAPID_KEY } from './lib/firebase.js';
 import { fmtMoney, resolveService } from './data.jsx';
 import { daysUntilNext } from './lib/recurrence.js';
 import { fbDb } from './firebase-init.jsx';
+import { saveDevice } from './lib/push.js';
 
 const NOTIF_TIMING_DAYS = { week: 7, three: 3, day: 1, same: 0 };
 
@@ -87,6 +88,7 @@ async function registerFcmToken(uid) {
     if (!token) return null;
     await fbDb.collection('users').doc(uid).collection('settings').doc('main')
       .set({ fcmToken: token, fcmTokenUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    await saveDevice(uid, token, 'web').catch(() => {});
     // Foreground messages: also show as notification (FCM doesn't auto-display when page is open)
     messaging.onMessage((payload) => {
       const n = payload.notification || {};

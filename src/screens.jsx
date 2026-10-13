@@ -465,8 +465,12 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
             </label>
           </div>
         )}
-        <Row icon="history" tint="var(--sky)" label="סיכום חודשי" sub="בתחילת כל חודש"
+        <Row icon="history" tint="var(--sky)" label="סיכום חודשי" sub="ב־1 לחודש: כמה יצא בחודש שעבר"
           right={<Toggle checked={settings.monthlySummary} onChange={v => update({ monthlySummary: v })} />} />
+        <Row icon="card" tint="var(--mint)" label="התראת תקציב" sub="ב־80% וב־100% מהתקרה"
+          right={<Toggle checked={settings.budgetAlerts !== false} onChange={v => update({ budgetAlerts: v })} />} />
+        <Row icon="user" tint="var(--lavender)" label="פעילות במרחב המשותף" sub="כשמישהו מוסיף הוצאה"
+          right={<Toggle checked={settings.sharedNotif !== false} onChange={v => update({ sharedNotif: v })} />} />
         <div style={{ padding: '12px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600 }}>
             {notifPerm === 'granted' ? 'הרשאה: מאושרת ✓' :

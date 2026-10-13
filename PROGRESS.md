@@ -54,7 +54,12 @@
 - [ ] תזכורות למנויים משותפים בצד השרת: `functions/` קורא רק `users/{uid}/payments` (וממילא לא נפרס)
 - [ ] ייצוא CSV (הוסר מהממשק עד שימומש)
 - [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
-- [ ] שלב 3 (צד שרת): push לשותף על הוצאה משותפת, סיכום חודשי, התראת תקציב. דורש לפרוס `functions/` (Blaze). המתג "סיכום חודשי" עדיין לא עושה כלום
+- [x] שלב 3 (צד שרת): `functions/index.js` נפרס מה־CI (`deploy.yml`, אחרון). Blaze פעיל
+  - `onSpaceItemCreated` (europe-west1, ליד Firestore ב־eur3): push לשאר חברי המרחב + התראת תקציב 80%/100% פעם אחת לחודש (`lists/{id}.budgetAlerts.mYYYYMM`)
+  - `monthlySummary` (1 לחודש 09:00): סה"כ החודש שעבר מול זה שלפניו, במרחב האישי
+  - `paymentReminders`: רק למכשירי ווב (`localReminders: false`), כולל מנויים משותפים
+  - מכשירים ב־`users/{uid}/devices/{deviceId}`. אנדרואיד: `@capacitor-firebase/messaging`, ערוצים shared-activity / budget / monthly-summary
+  - לוגיקה טהורה ב־`functions/lib.js` עם בדיקות. הטריגר והסיכום נבדקו מול Firestore emulator (FCM מדומה)
 - [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
 
 ## החלטות

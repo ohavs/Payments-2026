@@ -53,3 +53,12 @@ jobs:
         run: npx --yes firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project schedual-fdde7 --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      # Server push: partner activity, budget alerts, monthly summary and web
+      # reminders. Last, so the site and rules are live whatever happens here.
+      - name: Deploy Cloud Functions
+        run: |
+          npm ci --prefix functions
+          npx --yes firebase-tools@latest deploy --only functions --project schedual-fdde7 --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json

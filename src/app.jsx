@@ -20,6 +20,7 @@ import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
 import { haptic, isNative, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
 import { ensureNativeNotifPermission, onReminderTap, syncReminders } from './lib/reminders.js';
+import { bindForegroundPush, onPushTap, registerNativePush } from './lib/push.js';
 import { App as CapApp } from '@capacitor/app';
 import { checkForUpdateQuietly } from './lib/updater.js';
 
@@ -131,6 +132,13 @@ function AppInner() {
     return () => { h.then((x) => x.remove()); };
   }, [user?.uid, reminderKey, settingsLoading, paymentsLoading]);
   useEffect(() => onReminderTap((extra) => { if (extra.tab) setTab(extra.tab); }), []);
+  useEffect(() => onPushTap((data) => { if (data.tab) setTab(data.tab); }), []);
+  // Android: register for server push (partner activity, budget, summary).
+  useEffect(() => {
+    if (!isNative || !user || settingsLoading) return;
+    bindForegroundPush();
+    registerNativePush(user.uid);
+  }, [user?.uid, settingsLoading, settings.notif]);
 
   // Re-register FCM token on app load if notification permission is already granted
   // (handles new device, token expiry, etc.)

@@ -98,6 +98,8 @@ const DEFAULT_SETTINGS = {
   notifTimings: ['three', 'day'],
   notifTime: '09:00',
   monthlySummary: true,
+  sharedNotif: true,     // push when a partner adds to a shared space
+  budgetAlerts: true,    // push at 80% / 100% of the monthly cap
   theme: 'system',
   language: 'he',
   defaultCurrency: '₪',
