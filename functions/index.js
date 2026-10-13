@@ -1,8 +1,12 @@
 // Cloud Functions: push notifications from the server.
 //
-//   paymentReminders   hourly   reminders for web devices (Android schedules its own)
+//   paymentReminders   hourly   reminders for web devices (Android schedules its own);
+//                               on the 1st at 9:00 also the monthly summary
+//                               ("בספטמבר הוצאת ₪4,210, 12% פחות מאוגוסט")
 //   onSpaceItemCreated trigger  a partner's expense in a shared space; budget alerts
-//   monthlySummary     1st 9:00 "בספטמבר הוצאת ₪4,210, 12% פחות מאוגוסט"
+//
+// The summary rides on the hourly schedule: a new scheduled function needs
+// an IAM change on its Cloud Run service that the deploy account can't make.
 //
 // Devices register under users/{uid}/devices/{deviceId} = { token, platform,
 // localReminders }. users/{uid}/settings/main.fcmToken is the older single web
@@ -127,6 +131,7 @@ exports.paymentReminders = onSchedule(
       }
     }
     logger.info(`reminders hour=${hour} users=${users.length} sent=${sent}`);
+    if (hour === '09' && jerusalemToday(now).d === 1) await sendMonthlySummaries();
   }
 );
 
@@ -190,37 +195,38 @@ exports.onSpaceItemCreated = onDocumentCreated(
 );
 
 // 1st of the month: last month's total in the personal space vs the month before.
-exports.monthlySummary = onSchedule(
-  { schedule: '0 9 1 * *', timeZone: TZ, region: SCHEDULE_REGION, memory: '256MiB', timeoutSeconds: 300 },
-  async () => {
-    const today = jerusalemToday();
-    const last = new Date(today.y, today.m - 1, 1);
-    const before = new Date(today.y, today.m - 2, 1);
-    const a = lib.monthRange(last.getFullYear(), last.getMonth());
-    const b = lib.monthRange(before.getFullYear(), before.getMonth());
-    const users = await db.collection('users').listDocuments();
-    let sent = 0;
-    for (const userRef of users) {
-      try {
-        const uid = userRef.id;
-        const s = await settingsOf(uid);
-        if (s.monthlySummary === false) continue;
-        const owned = await db.collection('lists').where('ownerUid', '==', uid).get();
-        const personal = owned.docs.find((d) => (d.data().kind || 'personal') !== 'shared');
-        if (!personal) continue;
-        const sumIn = async (r) => lib.sumAmounts((await personal.ref.collection('items')
-          .where('date', '>=', r.from).where('date', '<=', r.to).get()).docs.map((d) => d.data()));
-        const subs = s.includeSubsInBudget !== false
-          ? lib.subsMonthly((await userRef.collection('payments').get()).docs.map((d) => d.data())) : 0;
-        const spent = await sumIn(a);
-        if (spent <= 0) continue;
-        const prevSpent = await sumIn(b);
-        const msg = lib.summaryMessage(last.getMonth(), spent + subs, prevSpent > 0 ? prevSpent + subs : 0);
-        sent += await sendToUser(uid, { ...msg, channel: 'monthly-summary', data: { tab: 'summary' } });
-      } catch (err) {
-        logger.error(`summary failed uid=${userRef.id}`, err);
-      }
+async function sendMonthlySummaries() {
+  const today = jerusalemToday();
+  const last = new Date(today.y, today.m - 1, 1);
+  const before = new Date(today.y, today.m - 2, 1);
+  const a = lib.monthRange(last.getFullYear(), last.getMonth());
+  const b = lib.monthRange(before.getFullYear(), before.getMonth());
+  const users = await db.collection('users').listDocuments();
+  let sent = 0;
+  for (const userRef of users) {
+    try {
+      const uid = userRef.id;
+      const s = await settingsOf(uid);
+      if (s.monthlySummary === false) continue;
+      const owned = await db.collection('lists').where('ownerUid', '==', uid).get();
+      const personal = owned.docs.find((d) => (d.data().kind || 'personal') !== 'shared');
+      if (!personal) continue;
+      const sumIn = async (r) => lib.sumAmounts((await personal.ref.collection('items')
+        .where('date', '>=', r.from).where('date', '<=', r.to).get()).docs.map((d) => d.data()));
+      const subs = s.includeSubsInBudget !== false
+        ? lib.subsMonthly((await userRef.collection('payments').get()).docs.map((d) => d.data())) : 0;
+      const spent = await sumIn(a);
+      if (spent <= 0) continue;
+      const prevSpent = await sumIn(b);
+      const msg = lib.summaryMessage(last.getMonth(), spent + subs, prevSpent > 0 ? prevSpent + subs : 0);
+      sent += await sendToUser(uid, { ...msg, channel: 'monthly-summary', data: { tab: 'summary' } });
+    } catch (err) {
+      logger.error(`summary failed uid=${userRef.id}`, err);
     }
-    logger.info(`monthly summary ${a.key} sent=${sent}`);
   }
-);
+  logger.info(`monthly summary ${a.key} sent=${sent}`);
+  return sent;
+}
+
+// Not a Cloud Function (no trigger): exported for the emulator test.
+exports.sendMonthlySummaries = sendMonthlySummaries;
