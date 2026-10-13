@@ -122,7 +122,7 @@ const CYCLE_HE = { monthly: 'לחודש', yearly: 'לשנה' };
 function gmailError(e) {
   if (e?.code === 'gmail/api-disabled') return 'הגישה ל־Gmail עוד לא הופעלה בפרויקט. זה בטיפול.';
   if (e?.code === 'gmail/forbidden' || e?.code === 'auth/user-cancelled' || /access_denied|denied|12501|blocked/i.test(e?.message || '')) {
-    return 'Google חסמה את הגישה ל־Gmail. צריך לאשר את החשבון כבודק בהגדרות הפרויקט ב־Google Cloud.';
+    return 'Google חסמה את הגישה ל־Gmail. צריך לפרסם את האפליקציה (Publish app) במסך ההרשאות ב־Google Cloud.';
   }
   if (e?.code === 'auth/popup-closed-by-user' || /cancel/i.test(e?.message || '')) return 'הכניסה בוטלה.';
   if (e?.code === 'auth/user-mismatch') return 'צריך לבחור את אותו חשבון Google שמחובר לאפליקציה.';
