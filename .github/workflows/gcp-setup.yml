@@ -47,7 +47,7 @@ jobs:
           gcloud projects get-iam-policy "$PROJECT" --flatten='bindings[].members' \
             --filter="bindings.members:serviceAccount:$EMAIL" --format='value(bindings.role)' 2>&1 | sed 's/^/role: /'
           # Service-agent roles a functions deploy needs (Eventarc trigger + schedules):
-          # pubsub agent: iam.serviceAccountTokenCreator; compute SA: run.invoker + eventarc.eventReceiver.
+          # pubsub agent: iam.serviceAccountTokenCreator. Compute SA: run.invoker and eventarc.eventReceiver.
           N=267719533646
           for M in "serviceAccount:service-$N@gcp-sa-pubsub.iam.gserviceaccount.com" "serviceAccount:$N-compute@developer.gserviceaccount.com"; do
             gcloud projects get-iam-policy "$PROJECT" --flatten='bindings[].members' \
