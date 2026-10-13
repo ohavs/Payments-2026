@@ -419,12 +419,17 @@ function PendingInvitesCard({ lists }) {
 }
 
 // ---------- Shared inputs ----------
+// Numbers are typed into a text field (decimal keypad): the browser's number
+// input brings spinners, scroll-to-change and accepts "e".
 function FieldInput({ value, onChange, placeholder, type = 'text', onEnter, dir, inputRef, inputMode, big }) {
+  const numeric = type === 'number';
+  const clean = (v) => v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
   return (
     <input
       ref={inputRef}
-      value={value} onChange={e => onChange(e.target.value)}
-      placeholder={placeholder} type={type} dir={dir} inputMode={inputMode}
+      value={value ?? ''} onChange={e => onChange(numeric ? clean(e.target.value) : e.target.value)}
+      placeholder={placeholder} type={numeric ? 'text' : type} dir={dir}
+      inputMode={numeric ? (inputMode || 'decimal') : inputMode}
       onKeyDown={e => { if (e.key === 'Enter' && onEnter) onEnter(); }}
       style={{
         width: '100%', background: 'var(--surface-2)', border: 'none', outline: 'none',

@@ -4,7 +4,7 @@ import { BudgetSettingsSheet, useSubsMonthly } from './budget.jsx';
 import { Chip, Icon, IconButton, Row, Sheet, Toggle } from './components.jsx';
 import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, monthlyEquivalent, resolveService, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
 import { occurrencesBetween } from './lib/recurrence.js';
-import { appVersion, isNative } from './lib/platform.js';
+import { appVersion, haptic, isNative } from './lib/platform.js';
 import { Spinner, useToast } from './feedback.jsx';
 import { ManageExpensesSheet } from './lists.jsx';
 import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNotification } from './notifications.jsx';
@@ -14,6 +14,7 @@ import { detectStatus, openDetectAccess, setDetectEnabled } from './lib/detect.j
 import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
+import { TimePickerSheet } from './ui/time-picker.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
 function StatsDetailSheet({ open, onClose, payments, currency = '₪', rates }) {
@@ -312,6 +313,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   const [testBusy, setTestBusy] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [timeOpen, setTimeOpen] = useState(false);
   const currency = settings.defaultCurrency || '₪';
   const subsMonthly = useSubsMonthly(payments, currency);
 
@@ -470,14 +472,14 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
                 }}>{t.label}</Chip>
               ))}
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
               <span style={{ fontSize: 14.5, fontWeight: 600 }}>שעה ביום</span>
-              <input type="time" value={settings.notifTime} onChange={e => update({ notifTime: e.target.value })} style={{
-                background: 'var(--surface-2)', border: 'none', outline: 'none',
-                color: 'var(--ink)', fontSize: 16, fontWeight: 700, fontFamily: 'inherit',
-                padding: '9px 14px', borderRadius: 12, fontVariantNumeric: 'tabular-nums',
-              }} />
-            </label>
+              <button onClick={() => { haptic('tap'); setTimeOpen(true); }} className="press" aria-label="שעת התזכורת" style={{
+                background: 'var(--surface-2)', border: 'none', cursor: 'pointer',
+                color: 'var(--ink)', fontSize: 17, fontWeight: 800, fontFamily: 'inherit',
+                padding: '9px 16px', borderRadius: 14, fontVariantNumeric: 'tabular-nums',
+              }}>{settings.notifTime || '09:00'}</button>
+            </div>
           </div>
         )}
         <Row icon="history" tint="var(--sky)" label="סיכום חודשי" sub="ב־1 לחודש: כמה יצא בחודש שעבר"
@@ -547,6 +549,8 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       <BudgetSettingsSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
         settings={settings} setSettings={setSettings} categories={categories} subsMonthly={subsMonthly} />
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
+      <TimePickerSheet open={timeOpen} onClose={() => setTimeOpen(false)} title="שעת התזכורת"
+        value={settings.notifTime || '09:00'} onSave={(v) => update({ notifTime: v })} />
     </div>
   );
 }

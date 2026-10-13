@@ -310,6 +310,13 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
 // CustomServiceBuilder — name, image upload, color picker, glyph, category
 // Used standalone (creating from scratch) and as the "ערוך שירות" flow.
 // =================================================================
+// More colours behind the rainbow swatch, instead of the system colour dialog.
+const EXTRA_PALETTE = [
+  '#FFE4E1', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF',
+  '#F25C54', '#FF8A3D', '#FFC93C', '#22A45D', '#14B8A6', '#3B82F6', '#6366F1', '#A855F7',
+  '#991B1B', '#9A3412', '#854D0E', '#166534', '#115E59', '#1E3A8A', '#3730A3', '#6B21A8',
+  '#FFFFFF', '#E5E7EB', '#9CA3AF', '#6B7280', '#4B5563', '#374151', '#1F2937', '#0F0F11',
+];
 const SERVICE_PALETTE = [
   '#E50914', '#1DB954', '#10A37F', '#5E6AD2', '#FA0F00',
   '#7E57C2', '#F5A623', '#22C55E', '#0EA5E9', '#EC4899',
@@ -320,6 +327,7 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
   const [name, setName] = useState(initial?.name || '');
   const [cat, setCat] = useState(initial?.cat || 'other');
   const [bg, setBg] = useState(initial?.bg || '#5E6AD2');
+  const [moreColors, setMoreColors] = useState(false);
   const [glyph, setGlyph] = useState(initial?.glyph || '');
   const [image, setImage] = useState(initial?.image || null);
   const fileRef = useRef(null);
@@ -417,14 +425,22 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
               border: '2px solid var(--stroke)', outline: bg === c ? '3px solid var(--ink)' : '3px solid transparent', outlineOffset: 2,
             }} />
           ))}
-          <label style={{
-            width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', border: '2px solid var(--stroke)',
-            background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)', position: 'relative', overflow: 'hidden',
-          }}>
-            <input type="color" value={bg} onChange={e => setBg(e.target.value)} aria-label="צבע אחר"
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-          </label>
+          <button onClick={() => setMoreColors((v) => !v)} aria-label="עוד צבעים" aria-expanded={moreColors} style={{
+            width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', border: '2px solid var(--stroke)', padding: 0,
+            background: 'conic-gradient(#F25C54, #FFC93C, #22A45D, #0EA5E9, #4F46E5, #EC4899, #F25C54)',
+            outline: !SERVICE_PALETTE.includes(bg) ? '3px solid var(--ink)' : '3px solid transparent', outlineOffset: 2,
+          }} />
         </div>
+        {moreColors && (
+          <div className="rise" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 8, marginTop: 12 }}>
+            {EXTRA_PALETTE.map(c => (
+              <button key={c} onClick={() => setBg(c)} aria-label={c} style={{
+                aspectRatio: '1 / 1', borderRadius: '50%', cursor: 'pointer', background: c, padding: 0,
+                border: '2px solid var(--stroke)', outline: bg === c ? '3px solid var(--ink)' : '3px solid transparent', outlineOffset: 2,
+              }} />
+            ))}
+          </div>
+        )}
 
         <FieldLabel>קטגוריה</FieldLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

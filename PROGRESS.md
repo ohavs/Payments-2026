@@ -63,6 +63,8 @@
   - הרשאות סוכני השירות לפריסת Functions הוגדרו ידנית (pubsub tokenCreator, compute run.invoker + eventarc.eventReceiver). חשבון הפריסה (Editor) לא יכול לשנות IAM בעצמו
 - [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
 
+- [x] פקדים מותאמים במקום ברירות המחדל של הדפדפן: בורר שעות (`src/ui/time-picker.jsx`, שעות משמאל, דקות מימין, קפיצות של 5 דק׳), פלטת צבעים מורחבת במקום `input type=color`, שדות מספר כטקסט עם מקלדת עשרונית, צבעי caret/selection. תאריכים כבר היו מותאמים (`MiniCalendar`)
+
 ## החלטות
 - הפצה: APK ב־GitHub Releases + עדכון מתוך האפליקציה. בלי Play.
 - כניסה: חשבון Google.

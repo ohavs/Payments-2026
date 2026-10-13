@@ -145,3 +145,8 @@ input[type="number"], input[type="date"], input[type="time"] { direction: ltr; t
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Caret, text selection and native accents in the app's colours. */
+input, textarea { caret-color: var(--accent); }
+::selection { background: var(--accent-soft); color: var(--ink); }
+:root { accent-color: var(--accent); }
