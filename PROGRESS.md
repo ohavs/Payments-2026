@@ -56,7 +56,7 @@
 - [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
 - [x] שלב 3 (צד שרת): `functions/index.js` נפרס מה־CI (`deploy.yml`, אחרון). Blaze פעיל
   - `onSpaceItemCreated` (europe-west1, ליד Firestore ב־eur3): push לשאר חברי המרחב + התראת תקציב 80%/100% פעם אחת לחודש (`lists/{id}.budgetAlerts.mYYYYMM`)
-  - `monthlySummary` (1 לחודש 09:00): סה"כ החודש שעבר מול זה שלפניו, במרחב האישי
+  - סיכום חודשי (1 לחודש 09:00): רץ בתוך `paymentReminders` השעתית, כי פונקציה מתוזמנת חדשה דורשת הרשאת invoker על שירות Cloud Run שחשבון הפריסה לא יכול לתת. נפרס בהצלחה 2026-10-13
   - `paymentReminders`: רק למכשירי ווב (`localReminders: false`), כולל מנויים משותפים
   - מכשירים ב־`users/{uid}/devices/{deviceId}`. אנדרואיד: `@capacitor-firebase/messaging`, ערוצים shared-activity / budget / monthly-summary
   - לוגיקה טהורה ב־`functions/lib.js` עם בדיקות. הטריגר והסיכום נבדקו מול Firestore emulator (FCM מדומה)
