@@ -21,3 +21,37 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The app against the Firebase emulators (auth + Firestore with the real
+  # rules): one user's flows and a shared space for two. See e2e/.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            e2e/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Build against the emulators
+        run: npx vite build --outDir dist-emu
+        env:
+          VITE_USE_EMULATORS: '1'
+      - run: npm test
+        working-directory: e2e
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: e2e-report
+          path: e2e/playwright-report

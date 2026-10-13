@@ -1,0 +1,12 @@
+{
+  "name": "payments-2026-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --config ../firebase.json --only auth,firestore --project demo-payments \"playwright test\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "firebase-tools": "15.33.0"
+  }
+}

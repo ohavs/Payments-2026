@@ -61,7 +61,7 @@
   - מכשירים ב־`users/{uid}/devices/{deviceId}`. אנדרואיד: `@capacitor-firebase/messaging`, ערוצים shared-activity / budget / monthly-summary
   - לוגיקה טהורה ב־`functions/lib.js` עם בדיקות. הטריגר והסיכום נבדקו מול Firestore emulator (FCM מדומה)
   - הרשאות סוכני השירות לפריסת Functions הוגדרו ידנית (pubsub tokenCreator, compute run.invoker + eventarc.eventReceiver). חשבון הפריסה (Editor) לא יכול לשנות IAM בעצמו
-- [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
+- [x] שלב 4: e2e ב־CI (`e2e/`, Playwright מול emulators עם ה־rules האמיתיים): משתמש אחד (הוצאות, הוספה מהירה, מנויים, מצב כהה) ומרחב משותף לשניים (הצטרפות בקוד, מי שילם, סנכרון חי, מנוי משותף, פרטיות המרחב האישי). מקומית: `VITE_USE_EMULATORS=1 npx vite build --outDir dist-emu && cd e2e && npm test`
 
 - [x] פקדים מותאמים במקום ברירות המחדל של הדפדפן: בורר שעות (`src/ui/time-picker.jsx`, שעות משמאל, דקות מימין, קפיצות של 5 דק׳), פלטת צבעים מורחבת במקום `input type=color`, שדות מספר כטקסט עם מקלדת עשרונית, צבעי caret/selection. תאריכים כבר היו מותאמים (`MiniCalendar`)
 
