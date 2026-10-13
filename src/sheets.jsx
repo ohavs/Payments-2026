@@ -322,15 +322,11 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
         borderTop: '1px solid var(--divider)',
         marginTop: 12,
       }}>
-        <button onClick={save} disabled={saving || !isDirty} style={{
-          width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none',
-          cursor: saving ? 'wait' : (isDirty ? 'pointer' : 'not-allowed'),
-          background: 'var(--accent)', color: 'var(--accent-fg)',
-          fontFamily: 'inherit', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
-          opacity: isDirty ? 1 : .55, transition: 'opacity .15s ease',
+        <button onClick={save} disabled={saving || !isDirty} className="btn-primary" style={{
+          width: '100%', height: 56, fontFamily: 'inherit', fontSize: 16.5,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
-          {saving && <Spinner size={16} color="var(--accent-fg)" />}
+          {saving && <Spinner size={16} color="var(--ink-dim)" />}
           {saving ? 'שומר...' : isDirty ? 'שמור שינויים' : 'אין שינויים'}
         </button>
       </div>
@@ -500,10 +496,8 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
         padding: '14px 22px 22px',
         borderTop: '1px solid var(--divider)',
       }}>
-        <button onClick={save} style={{
-          width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none', cursor: 'pointer',
-          background: 'var(--accent)', color: 'var(--accent-fg)',
-          fontFamily: 'inherit', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
+        <button onClick={save} className="btn-primary" style={{
+          width: '100%', height: 56, fontFamily: 'inherit', fontSize: 16.5,
         }}>המשך</button>
       </div>
     </>
@@ -657,15 +651,11 @@ function AddSheet({ open, onClose, onAdd }) {
           padding: '14px 22px 22px',
           borderTop: '1px solid var(--divider)',
         }}>
-          <button onClick={submit} disabled={saving} style={{
-            width: '100%', padding: '15px 18px', borderRadius: 16, border: 'none',
-            cursor: saving ? 'wait' : 'pointer',
-            background: 'var(--accent)', color: 'var(--accent-fg)',
-            fontFamily: 'inherit', fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em',
+          <button onClick={submit} disabled={saving} className="btn-primary" style={{
+            width: '100%', height: 56, fontFamily: 'inherit', fontSize: 16.5,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            opacity: saving ? .8 : 1,
           }}>
-            {saving && <Spinner size={16} color="var(--accent-fg)" />}
+            {saving && <Spinner size={16} color="var(--ink-dim)" />}
             {saving ? 'מוסיף...' : 'הוסף תשלום'}
           </button>
         </div>
