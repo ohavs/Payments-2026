@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest';
 vi.mock('@capacitor/core', () => ({ registerPlugin: () => ({}), Capacitor: { isNativePlatform: () => false } }));
 vi.mock('@capacitor/app', () => ({ App: {} }));
 vi.mock('@capacitor/status-bar', () => ({ StatusBar: {}, Style: {} }));
+vi.mock('./detect.js', () => ({ detectStatus: async () => ({}) }));
 
 const { parseRelease } = await import('./updater.js');
 
@@ -29,4 +30,22 @@ it('reads version, checksum, download URL and notes from a release', () => {
 it('ignores releases without the update marker or the APK', () => {
   expect(parseRelease({ ...release, body: 'notes only' })).toBeNull();
   expect(parseRelease({ ...release, assets: [] })).toBeNull();
+});
+
+// Since the lite split: the marker carries both builds.
+const split = {
+  ...release,
+  tag_name: 'v2.0.30',
+  body: '- שיפורים\n\nטלפון חדש? להתקנה ראשונה מוואטסאפ או מהדפדפן: payments-lite.apk. את זיהוי התשלומים מתקינים אחר כך מתוך האפליקציה.\n\n<!-- update {"versionCode":130,"sha256":"aaa","apk":"payments.apk","lite":{"apk":"payments-lite.apk","sha256":"bbb"}} -->\n',
+  assets: [
+    { name: 'payments.apk', size: 7000000, browser_download_url: 'https://example.test/payments.apk' },
+    { name: 'payments-lite.apk', size: 6900000, browser_download_url: 'https://example.test/payments-lite.apk' },
+  ],
+};
+
+it('picks the build that matches the installed variant', () => {
+  expect(parseRelease(split)).toMatchObject({ versionCode: 130, sha256: 'aaa', url: 'https://example.test/payments.apk', notes: ['שיפורים'] });
+  expect(parseRelease(split, 'lite')).toMatchObject({ versionCode: 130, sha256: 'bbb', url: 'https://example.test/payments-lite.apk' });
+  // A release from before the split has no lite build: lite installs take the full one.
+  expect(parseRelease(release, 'lite')).toMatchObject({ versionCode: 104, url: release.assets[0].browser_download_url });
 });

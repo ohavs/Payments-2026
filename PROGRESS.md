@@ -66,6 +66,10 @@
 - [x] פקדים מותאמים במקום ברירות המחדל של הדפדפן: בורר שעות (`src/ui/time-picker.jsx`, שעות משמאל, דקות מימין, קפיצות של 5 דק׳), פלטת צבעים מורחבת במקום `input type=color`, שדות מספר כטקסט עם מקלדת עשרונית, צבעי caret/selection. תאריכים כבר היו מותאמים (`MiniCalendar`)
 
 - [x] Gmail אוטומטי (אנדרואיד): `GmailTokenPlugin.silentToken` (GoogleAuthUtil, בלי UI). אחרי סריקה ידנית ראשונה, סריקה שקטה של 30 יום בכל פתיחה/חזרה (פעם ב־4 שעות), והקבלות נכנסות לכרטיס ההצעות יחד עם Wallet (`useGmailInbox`, localStorage)
+- [x] Play Protect חסם התקנה בטלפון חדש ("האפליקציה נחסמה כדי להגן על המכשיר", בלי "התקן בכל זאת"): הגנת ההונאה של Google חוסמת התקנה מדפדפן/וואטסאפ/מנהל קבצים של אפליקציה שמצהירה על NotificationListenerService
+  - buildType `lite` (`android/app/src/lite/AndroidManifest.xml` מסיר את השירות). כל Release כולל `payments.apk` (מלא) ו־`payments-lite.apk`; ה־marker כולל את שניהם, והמעדכן נשאר על אותו סוג
+  - בלייט, "תשלומים מהטלפון" פותח "זיהוי תשלומים" שמתקין את המלא מתוך האפליקציה (אותה גרסה, הנתונים נשארים)
+  - לא ידוע אם Play Protect חוסם גם התקנה שהאפליקציה עצמה מפעילה. אם כן: לכבות זמנית סריקה ב־Play Protect
 - [ ] Gmail במצב Testing: ההסכמה פגה כל 7 ימים. פתרון: Publish (דורש Branding). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 
 ## החלטות

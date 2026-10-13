@@ -90,6 +90,8 @@ function AppInner() {
   const [editCustom, setEditCustom] = useState(null);
   const [update, setUpdate] = useState(null);       // latest release info, when newer
   const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateMode, setUpdateMode] = useState('update');
+  const openUpdates = (mode) => { setUpdateMode(mode); setUpdateOpen(true); };
   const [sharedOpen, setSharedOpen] = useState(false);
   const [quickPrefill, setQuickPrefill] = useState(null);
   const [gmailOpen, setGmailOpen] = useState(false);
@@ -299,14 +301,15 @@ function AppInner() {
               categories={categories}
               payments={payments}
               onSignOut={handleSignOut}
-              onOpenUpdates={() => setUpdateOpen(true)}
+              onOpenUpdates={() => openUpdates('update')}
+              onOpenFullBuild={() => openUpdates('full')}
               onOpenGmail={() => setGmailOpen(true)}
             />
           )}
         </main>
 
         {update && !updateOpen && (
-          <button onClick={() => setUpdateOpen(true)} className="rise" style={{
+          <button onClick={() => openUpdates('update')} className="rise" style={{
             position: 'absolute', top: 'calc(10px + env(safe-area-inset-top))', left: '50%', transform: 'translateX(-50%)',
             zIndex: 60, border: 'none', cursor: 'pointer', borderRadius: 999, padding: '10px 18px',
             background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
@@ -349,7 +352,7 @@ function AppInner() {
           onClose={() => setEditCustom(null)}
           onSave={(p) => { savePayment(p); setEditCustom(null); }}
         />
-        <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
+        <UpdateSheet open={updateOpen} mode={updateMode} onClose={() => setUpdateOpen(false)} initial={update} />
         <SharedSpaceSheet open={sharedOpen} onClose={() => setSharedOpen(false)} lists={lists} />
         <GmailScanSheet open={gmailOpen} onClose={() => setGmailOpen(false)}
           categories={categories} items={lists.items} subs={allSubs}

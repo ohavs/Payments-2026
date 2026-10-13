@@ -2,6 +2,7 @@ package com.ohavs.payments.detect;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Settings;
 
@@ -67,9 +68,24 @@ public class PaymentDetectPlugin extends Plugin {
         return NotificationManagerCompat.getEnabledListenerPackages(getContext()).contains(getContext().getPackageName());
     }
 
+    /**
+     * The lite build (first install from a browser or WhatsApp) leaves the
+     * listener out of the manifest, since Play Protect blocks sideloaded apps
+     * that declare one. Detection needs the full build.
+     */
+    private boolean listenerDeclared() {
+        try {
+            getContext().getPackageManager().getServiceInfo(new ComponentName(getContext(), PaymentListenerService.class), 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
     @PluginMethod
     public void status(PluginCall call) {
         JSObject ret = new JSObject();
+        ret.put("available", listenerDeclared());
         ret.put("access", hasAccess());
         ret.put("enabled", SuggestionStore.isEnabled(getContext()));
         call.resolve(ret);

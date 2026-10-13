@@ -1,12 +1,14 @@
 // "Check for updates" (Android): compare with the latest GitHub Release,
-// download it in-app and open Android's installer.
+// download it in-app and open Android's installer. mode="full" switches a lite
+// install (no notification listener) to the full build for payment detection.
 import React from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { Sheet } from './components.jsx';
 import { Spinner } from './feedback.jsx';
-import { canInstallUpdates, checkForUpdate, installUpdate, openInstallSettings } from './lib/updater.js';
+import { canInstallUpdates, checkForUpdate, checkFullBuild, installUpdate, openInstallSettings } from './lib/updater.js';
 
-function UpdateSheet({ open, onClose, initial }) {
+function UpdateSheet({ open, onClose, initial, mode = 'update' }) {
+  const full = mode === 'full';
   // checking | uptodate | available | permission | downloading | installing | error
   const [state, setState] = React.useState('checking');
   const [info, setInfo] = React.useState(initial || null);
@@ -15,18 +17,18 @@ function UpdateSheet({ open, onClose, initial }) {
   const check = React.useCallback(async () => {
     setState('checking');
     try {
-      const r = await checkForUpdate();
+      const r = await (full ? checkFullBuild() : checkForUpdate());
       setInfo(r);
       setState(r.available ? 'available' : 'uptodate');
     } catch (e) {
       setState('error');
     }
-  }, []);
+  }, [full]);
 
   React.useEffect(() => {
     if (!open) return;
-    if (initial?.available) { setInfo(initial); setState('available'); } else check();
-  }, [open]);
+    if (!full && initial?.available) { setInfo(initial); setState('available'); } else check();
+  }, [open, full]);
 
   // Coming back from Android's "install unknown apps" screen: continue.
   React.useEffect(() => {
@@ -52,7 +54,7 @@ function UpdateSheet({ open, onClose, initial }) {
   const current = info?.current;
 
   return (
-    <Sheet open={open} onClose={onClose} title="עדכונים" height="72%">
+    <Sheet open={open} onClose={onClose} title={full ? 'זיהוי תשלומים' : 'עדכונים'} height="72%">
       <div style={{ padding: '18px 22px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ fontSize: 14, color: 'var(--ink-dim)', fontWeight: 600 }}>
           הגרסה שלך: {current ? current.name : '…'}
@@ -74,7 +76,14 @@ function UpdateSheet({ open, onClose, initial }) {
           </div>
         )}
 
-        {latest && ['available', 'permission', 'downloading', 'installing'].includes(state) && (
+        {full && latest && ['available', 'permission', 'downloading', 'installing'].includes(state) && (
+          <div style={{ fontSize: 15, lineHeight: 1.55, fontWeight: 600 }}>
+            זיהוי תשלומים קורא את ההתראות של Wallet ואפליקציות האשראי, ולכן הוא נמצא בגרסה המלאה של האפליקציה ({latest.sizeMb}MB).
+            ההתקנה מחליפה את האפליקציה במקום, וכל הנתונים נשארים.
+          </div>
+        )}
+
+        {!full && latest && ['available', 'permission', 'downloading', 'installing'].includes(state) && (
           <>
             <div>
               <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em' }}>גרסה {latest.versionName} זמינה</div>
@@ -113,9 +122,14 @@ function UpdateSheet({ open, onClose, initial }) {
         {state === 'installing' && (
           <div style={{ fontSize: 14, fontWeight: 700 }}>אשר את ההתקנה בחלון של אנדרואיד.</div>
         )}
+        {full && state === 'installing' && (
+          <div style={{ fontSize: 13, lineHeight: 1.55, fontWeight: 600, color: 'var(--ink-dim)' }}>
+            אם Google Play Protect חוסם: Play Store ← התמונה שלך ← Play Protect ← ⚙ ← כבה את "סריקת אפליקציות" לרגע, התקן שוב מכאן, ואז הפעל בחזרה.
+          </div>
+        )}
 
         {state === 'available' && (
-          <button onClick={update} style={primaryBtn}>עדכן עכשיו</button>
+          <button onClick={update} style={primaryBtn}>{full ? 'התקן את הגרסה המלאה' : 'עדכן עכשיו'}</button>
         )}
         {state === 'permission' && (
           <button onClick={openInstallSettings} style={primaryBtn}>אפשר התקנת עדכונים</button>
