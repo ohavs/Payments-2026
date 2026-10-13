@@ -1,6 +1,7 @@
 // Login screen — Google primary, anonymous fallback.
 import React from 'react';
 import { Spinner, useToast } from './feedback.jsx';
+import { CoinLogo } from './ui/icons.jsx';
 
 function LoginScreen({ onSignInGoogle, onSignInAnonymous }) {
   const [busy, setBusy] = React.useState(null); // 'google' | 'anon' | null
@@ -29,36 +30,24 @@ function LoginScreen({ onSignInGoogle, onSignInAnonymous }) {
       padding: 24, direction: 'rtl',
       position: 'relative', overflow: 'hidden',
     }}>
-      <div className="bg-orbs" aria-hidden="true">
-        <span></span><span></span><span></span>
-      </div>
-
       <div style={{
         position: 'relative', textAlign: 'center', maxWidth: 360, width: '100%',
       }}>
-        <div style={{
-          width: 84, height: 84, borderRadius: 24,
-          background: 'var(--accent)', color: 'var(--accent-fg)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 44, fontWeight: 900, marginBottom: 20,
-          boxShadow: '0 20px 40px -12px rgba(242,255,68,.4)',
-        }}>₪</div>
+        <CoinLogo size={96} style={{ marginBottom: 22 }} />
 
-        <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 900, letterSpacing: '-0.03em' }}>
+        <h1 className="rise" style={{ margin: '0 0 10px', fontSize: 38, fontWeight: 900, letterSpacing: '-0.035em' }}>
           תשלומים
         </h1>
-        <p style={{ margin: '0 0 36px', fontSize: 15, color: 'var(--ink-dim)', lineHeight: 1.5 }}>
-          ניהול תשלומים חוזרים – חודשי, שבועי, יומי
+        <p className="rise" style={{ animationDelay: '60ms', margin: '0 0 40px', fontSize: 16.5, color: 'var(--ink-dim)', lineHeight: 1.5, fontWeight: 500 }}>
+          כל ההוצאות והמנויים במקום אחד,<br />עם תזכורת לפני כל חיוב
         </p>
 
-        <button onClick={handleGoogle} disabled={!!busy} style={{
-          width: '100%', padding: '14px 18px', borderRadius: 16,
-          border: 'none', cursor: busy ? 'wait' : 'pointer',
-          background: '#FFFFFF', color: '#1F1F1F',
-          fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
+        <button onClick={handleGoogle} disabled={!!busy} className="btn-primary" style={{
+          width: '100%', height: 58, padding: '0 18px',
+          cursor: busy ? 'wait' : 'pointer', background: '#FFFFFF', color: '#1F1F1F',
+          fontFamily: 'inherit', fontSize: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          marginBottom: 10, opacity: busy && busy !== 'google' ? .55 : 1,
-          transition: 'opacity .15s ease',
+          marginBottom: 14, opacity: busy && busy !== 'google' ? .55 : 1,
         }}>
           {busy === 'google' ? <Spinner size={18} color="#1F1F1F" /> : <GoogleLogo />}
           המשך עם Google
@@ -66,9 +55,9 @@ function LoginScreen({ onSignInGoogle, onSignInAnonymous }) {
 
         <button onClick={handleAnon} disabled={!!busy} style={{
           width: '100%', padding: '14px 18px', borderRadius: 16,
-          border: '1px solid var(--divider)', cursor: busy ? 'wait' : 'pointer',
-          background: 'transparent', color: 'var(--ink)',
-          fontFamily: 'inherit', fontWeight: 600, fontSize: 14,
+          border: 'none', cursor: busy ? 'wait' : 'pointer',
+          background: 'transparent', color: 'var(--ink-dim)',
+          fontFamily: 'inherit', fontWeight: 700, fontSize: 14.5,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           opacity: busy && busy !== 'anon' ? .55 : 1,
           transition: 'opacity .15s ease',

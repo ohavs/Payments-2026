@@ -1,0 +1,142 @@
+/* Design tokens and global styles.
+   Light is the default; [data-theme="dark"] on <html> switches palettes.
+   Older components read --surface-*, --accent and --ink-dim, so those names
+   stay and map onto the new palette. */
+
+:root {
+  --bg: #F6F6F3;
+  --surface-1: #FFFFFF;          /* cards, sheets */
+  --surface-2: #F0F0EC;          /* fields, quiet buttons */
+  --surface-3: #E5E5E0;
+  --ink: #141414;
+  --ink-dim: #5F5F66;            /* secondary text, 4.5:1 on --bg */
+  --divider: rgba(20, 20, 20, 0.07);
+  --stroke: #141414;             /* sticker outlines */
+
+  --accent: #22A45D;             /* brand green: primary action, progress */
+  --accent-fg: #141414;          /* text on --accent */
+  --accent-ink: #157A3B;         /* green text on light surfaces */
+  --accent-soft: #E3F3EA;
+  --danger: #D92D20;
+  --danger-soft: #FDECEC;
+  --warn: #B54708;
+
+  --lavender: #EEEDFE;
+  --mint: #E6F4EC;
+  --peach: #FFF1E6;
+  --sky: #E7F0FF;
+  --butter: #FFF7D6;
+
+  --chip-bg: var(--surface-2);
+  --chip-fg: var(--ink);
+  --glass-border: var(--divider);
+  --shadow-card: 0 1px 2px rgba(20, 20, 20, 0.04), 0 8px 24px rgba(20, 20, 20, 0.05);
+  --shadow-float: 0 12px 32px -10px rgba(20, 20, 20, 0.25);
+
+  --font: 'Rubik Variable', 'Rubik', system-ui, -apple-system, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0F0F11;
+  --surface-1: #1A1A1E;
+  --surface-2: #25252A;
+  --surface-3: #303036;
+  --ink: #F4F4F2;
+  --ink-dim: #A3A3AC;
+  --divider: rgba(255, 255, 255, 0.07);
+  --stroke: #0B0B0C;
+
+  --accent: #2DBE6C;
+  --accent-fg: #0B0B0C;
+  --accent-ink: #5AD48E;
+  --accent-soft: rgba(45, 190, 108, 0.16);
+  --danger: #FF6B5E;
+  --danger-soft: rgba(255, 107, 94, 0.14);
+  --warn: #F5A524;
+
+  --lavender: rgba(124, 108, 255, 0.16);
+  --mint: rgba(45, 190, 108, 0.14);
+  --peach: rgba(255, 138, 61, 0.15);
+  --sky: rgba(92, 155, 255, 0.15);
+  --butter: rgba(242, 183, 5, 0.14);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 12px 32px -10px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+#root { min-height: 100vh; }
+input, button, select, textarea { font-family: inherit; }
+
+/* Press feedback: a springy squeeze on anything tappable that opts in. */
+.press { transition: transform 0.22s var(--ease-spring); }
+.press:active { transform: scale(0.96); }
+button:active { transform: scale(0.97); }
+
+/* Primary CTA: brand green, ink outline, hard shadow (sticker style). */
+.btn-primary {
+  border: 2.5px solid var(--stroke); background: var(--accent); color: var(--accent-fg);
+  box-shadow: 0 4px 0 var(--stroke); border-radius: 18px;
+  font-weight: 800; cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+}
+.btn-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--stroke); }
+.btn-primary:disabled {
+  background: var(--surface-2); color: var(--ink-dim); border-color: var(--surface-3);
+  box-shadow: none; cursor: default; transform: none;
+}
+
+.hide-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scroll::-webkit-scrollbar { display: none; }
+
+/* Entrance animations. "backwards" so the end state is the element's own
+   style and later transitions still work. */
+.screen-in { animation: screenIn 0.4s var(--ease-out) backwards; }
+.rise { animation: rise 0.55s var(--ease-out) backwards; }
+.pop { animation: pop 0.45s var(--ease-spring); }
+.row-in { animation: rowIn 0.5s var(--ease-out) backwards; }
+.bump-a { animation: bumpA 0.28s var(--ease-spring); }
+.bump-b { animation: bumpB 0.28s var(--ease-spring); }
+.grow-x { animation: growX 0.9s var(--ease-out) backwards; transform-origin: right center; }
+@keyframes screenIn { from { opacity: 0; transform: translateY(10px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(0.985); } }
+@keyframes pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.14); } 100% { transform: scale(1); } }
+@keyframes rowIn { from { opacity: 0; transform: translateX(-20px); } }
+@keyframes bumpA { 50% { transform: scale(1.06); } }
+@keyframes bumpB { 50% { transform: scale(1.06); } }
+@keyframes growX { from { transform: scaleX(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes coinPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+/* Accordion used by older cards: grid-row 0fr → 1fr. */
+.stack-expand-area { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.42s var(--ease-out); }
+.stack-expand-area[data-open="true"] { grid-template-rows: 1fr; }
+.stack-expand-area > .stack-expand-wrap { overflow: hidden; min-height: 0; }
+.stack-expand-inner { transition: opacity 0.25s ease 0.1s, transform 0.25s ease 0.1s; }
+
+.row:hover { background: var(--divider); }
+
+input[type="date"], input[type="time"] { appearance: none; -webkit-appearance: none; }
+input[type="number"], input[type="date"], input[type="time"] { direction: ltr; text-align: end; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Inactive nav icons */
+:root { --nav-off-fill: #E8E8EA; --nav-off-stroke: #A1A1AA; }
+:root[data-theme="dark"] { --nav-off-fill: #34343A; --nav-off-stroke: #74747E; }

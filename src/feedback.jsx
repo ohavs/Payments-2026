@@ -1,6 +1,7 @@
 // Toast + Confirm dialog + Full-screen loader — custom-styled, no native alert/confirm.
 import React from 'react';
 import { Icon } from './components.jsx';
+import { CoinLogo } from './ui/icons.jsx';
 
 const ToastContext = React.createContext({ show: () => {} });
 const ConfirmContext = React.createContext({ confirm: () => Promise.resolve(false) });
@@ -53,34 +54,31 @@ function Toast({ toast }) {
     return () => cancelAnimationFrame(id);
   }, []);
   const palette = {
-    success: { bg: '#0F2E1A', border: 'rgba(34,197,94,.35)', icon: 'check', iconColor: '#22C55E' },
-    error:   { bg: '#2E0F12', border: 'rgba(255,92,92,.35)', icon: 'close', iconColor: '#FF5C5C' },
-    info:    { bg: 'rgba(20,20,20,.92)', border: 'rgba(255,255,255,.08)', icon: 'bell', iconColor: 'var(--accent)' },
-  }[toast.type] || {};
+    success: { icon: 'check', dot: '#22A45D' },
+    error:   { icon: 'close', dot: '#E5484D' },
+    info:    { icon: 'bell', dot: '#5C6BFF' },
+  }[toast.type] || { icon: 'bell', dot: '#5C6BFF' };
   return (
     <div style={{
       pointerEvents: 'auto',
-      background: palette.bg,
+      background: '#141414',
       color: '#FAFAFA',
-      borderRadius: 14, padding: '12px 14px',
+      borderRadius: 999, padding: '10px 18px 10px 12px',
       display: 'flex', alignItems: 'center', gap: 10,
-      backdropFilter: 'blur(20px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-      border: `1px solid ${palette.border}`,
-      boxShadow: '0 10px 30px -10px rgba(0,0,0,.5)',
-      fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em',
+      boxShadow: '0 12px 30px -10px rgba(0,0,0,.45)',
+      fontSize: 14.5, fontWeight: 700, letterSpacing: '-0.01em',
       opacity: show ? 1 : 0,
-      transform: show ? 'translateY(0)' : 'translateY(-12px)',
-      transition: 'opacity .25s ease, transform .25s cubic-bezier(.22,.61,.36,1)',
+      transform: show ? 'translateY(0) scale(1)' : 'translateY(-14px) scale(.96)',
+      transition: 'opacity .25s ease, transform .45s cubic-bezier(.34,1.56,.64,1)',
       direction: 'rtl', textAlign: 'start',
     }}>
       <div style={{
-        width: 28, height: 28, borderRadius: 999,
-        background: 'rgba(255,255,255,.08)',
+        width: 26, height: 26, borderRadius: 999,
+        background: palette.dot,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: palette.iconColor, flexShrink: 0,
+        color: '#FFFFFF', flexShrink: 0,
       }}>
-        <Icon name={palette.icon} size={16} strokeWidth={2.4} />
+        <Icon name={palette.icon} size={15} strokeWidth={3} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>{toast.msg}</div>
     </div>
@@ -107,19 +105,17 @@ function ConfirmDialog({ dialog, onResolve }) {
       padding: 24, direction: 'rtl',
     }}>
       <div onClick={() => onResolve(false)} style={{
-        position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)',
+        position: 'absolute', inset: 0, background: 'rgba(15,15,17,.45)',
         opacity: show ? 1 : 0, transition: 'opacity .2s ease',
-        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
       }} />
       <div style={{
         position: 'relative', width: '100%', maxWidth: 360,
         background: 'var(--surface-1)', color: 'var(--ink)',
-        borderRadius: 24, padding: 22,
-        boxShadow: '0 30px 80px -20px rgba(0,0,0,.7)',
-        border: '1px solid var(--divider)',
-        transform: show ? 'scale(1) translateY(0)' : 'scale(.94) translateY(8px)',
+        borderRadius: 28, padding: 22,
+        boxShadow: '0 30px 80px -20px rgba(0,0,0,.45)',
+        transform: show ? 'scale(1) translateY(0)' : 'scale(.92) translateY(8px)',
         opacity: show ? 1 : 0,
-        transition: 'transform .22s cubic-bezier(.22,.61,.36,1), opacity .22s ease',
+        transition: 'transform .35s cubic-bezier(.34,1.56,.64,1), opacity .2s ease',
       }}>
         {dialog.title && (
           <h3 style={{ margin: '0 0 8px', fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>
@@ -133,15 +129,15 @@ function ConfirmDialog({ dialog, onResolve }) {
         )}
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={() => onResolve(false)} style={{
-            flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
+            flex: 1, padding: '13px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
             background: 'var(--surface-2)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
           }}>{dialog.cancelLabel || 'ביטול'}</button>
           <button onClick={() => onResolve(true)} style={{
-            flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
-            background: danger ? '#FF5C5C' : 'var(--accent)',
+            flex: 1, padding: '13px 14px', borderRadius: 16, border: 'none', cursor: 'pointer',
+            background: danger ? 'var(--danger)' : 'var(--accent)',
             color: danger ? '#FFF' : 'var(--accent-fg)',
-            fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
+            fontFamily: 'inherit', fontWeight: 800, fontSize: 15,
           }}>{dialog.confirmLabel || 'אישור'}</button>
         </div>
       </div>
@@ -156,14 +152,8 @@ function FullScreenLoader({ label }) {
       flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       background: 'var(--bg)', color: 'var(--ink)', gap: 18, zIndex: 1000,
     }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: '50%',
-        border: '3px solid var(--divider)',
-        borderTopColor: 'var(--accent)',
-        animation: 'spin .9s linear infinite',
-      }} />
-      {label && <div style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 500 }}>{label}</div>}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <CoinLogo size={72} style={{ animation: 'coinPulse 1.4s ease-in-out infinite' }} />
+      {label && <div style={{ fontSize: 14, color: 'var(--ink-dim)', fontWeight: 600 }}>{label}</div>}
     </div>
   );
 }

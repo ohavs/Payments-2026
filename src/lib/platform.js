@@ -3,6 +3,7 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 export const isNative = Capacitor.isNativePlatform();
 
@@ -41,4 +42,19 @@ export async function appVersion() {
   if (!isNative) return null;
   const info = await App.getInfo();
   return { name: info.version, code: Number(info.build) || 0 };
+}
+
+// ---- Haptics (no-op on the web) ----
+// select: keypad/segment ticks · tap: nav, cards · press: the + button
+// success / warning: after saving / before deleting.
+export function haptic(kind = 'tap') {
+  if (!isNative) return;
+  const run = {
+    select: () => Haptics.selectionChanged(),
+    tap: () => Haptics.impact({ style: ImpactStyle.Light }),
+    press: () => Haptics.impact({ style: ImpactStyle.Medium }),
+    success: () => Haptics.notification({ type: NotificationType.Success }),
+    warning: () => Haptics.notification({ type: NotificationType.Warning }),
+  }[kind];
+  run?.().catch(() => {});
 }

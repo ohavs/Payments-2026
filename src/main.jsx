@@ -1,3 +1,5 @@
+import '@fontsource-variable/rubik';
+import './styles.css';
 import ReactDOM from 'react-dom/client';
 import { App } from './app.jsx';
 import { isNative } from './lib/platform.js';

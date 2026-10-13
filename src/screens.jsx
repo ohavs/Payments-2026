@@ -1,76 +1,15 @@
-// Main screens: Home, Calendar, Settings
+// Settings screen, the subscriptions calendar and the subscriptions breakdown sheet.
 import React, { useEffect, useMemo, useState } from 'react';
-import { BudgetDetailSheet, BudgetHeroCard, BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from './budget.jsx';
+import { BudgetSettingsSheet, useSubsMonthly } from './budget.jsx';
 import { Chip, Icon, IconButton, Row, Sheet, Toggle } from './components.jsx';
-import { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, isAutoPaid, monthlyEquivalent, parseISODate, resolveService, statusDateISO, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
+import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, monthlyEquivalent, resolveService, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
 import { occurrencesBetween } from './lib/recurrence.js';
 import { appVersion, isNative } from './lib/platform.js';
 import { Spinner, useToast } from './feedback.jsx';
-import { useExchangeRates } from './fx.jsx';
-import { DEFAULT_CATEGORIES, ExpenseListSection, MONTH_NAMES_HE, PendingInvitesCard, useLists } from './lists.jsx';
+import { ManageExpensesSheet } from './lists.jsx';
 import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNotification } from './notifications.jsx';
-import { ListCard, SectionHeader, TotalsCard } from './payment-card.jsx';
-import { StackedPaymentList } from './stacked-list.jsx';
-
-// ---------- Swipeable stats carousel (One UI-style widget pager) ----------
-function StatsCarousel({ pages }) {
-  const railRef = React.useRef(null);
-  const [page, setPage] = React.useState(0);
-
-  // Snap-scroll observer → derive the active page from scroll position
-  React.useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    let raf = null;
-    const onScroll = () => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const w = rail.clientWidth;
-        const idx = Math.round(rail.scrollLeft / w);
-        // RTL: scrollLeft can be negative or inverted. Normalize.
-        const childCount = pages.length;
-        const computed = childCount > 1 ? Math.min(childCount - 1, Math.max(0, Math.abs(idx))) : 0;
-        setPage(computed);
-      });
-    };
-    rail.addEventListener('scroll', onScroll, { passive: true });
-    return () => { rail.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [pages.length]);
-
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div ref={railRef} className="hide-scroll" style={{
-        display: 'flex', overflowX: 'auto', overflowY: 'hidden',
-        scrollSnapType: 'x mandatory',
-        WebkitOverflowScrolling: 'touch',
-        gap: 0,
-      }}>
-        {pages.map((p, i) => (
-          <div key={i} style={{
-            flex: '0 0 100%', scrollSnapAlign: 'center',
-            scrollSnapStop: 'always',
-            paddingInline: 1,
-          }}>{p}</div>
-        ))}
-      </div>
-      {/* Pagination dots — hidden when there's only one page */}
-      {pages.length > 1 && (
-        <div style={{
-          display: 'flex', justifyContent: 'center', gap: 6,
-          marginTop: 10,
-        }}>
-          {pages.map((_, i) => (
-            <span key={i} style={{
-              width: page === i ? 18 : 6, height: 6, borderRadius: 999,
-              background: page === i ? 'var(--accent)' : 'var(--surface-3)',
-              transition: 'width .25s cubic-bezier(.22,.61,.36,1), background .2s ease',
-            }} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { ListCard, SectionHeader } from './payment-card.jsx';
+import { Segmented } from './ui/kit.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
 function StatsDetailSheet({ open, onClose, payments, currency = '₪', rates }) {
@@ -223,324 +162,6 @@ function HighlightRow({ icon, label, value }) {
 }
 
 
-// ---------- HOME / EXPENSES ----------
-// Expenses + budget own this whole tab, so everything can breathe: one large
-// budget card, then the month's expenses. Subscriptions live in their own tab
-// and are linked from the strip at the bottom.
-function HomeScreen({ user, payments, onOpenAdd, onOpenExpense, settings, setSettings, onGoSubs }) {
-  const [budgetOpen, setBudgetOpen] = useState(false);
-  const [budgetSettingsOpen, setBudgetSettingsOpen] = useState(false);
-  const [addSignal, setAddSignal] = useState(0);
-  // The month the whole tab reports on — the statistics card navigates it and
-  // the expenses list below follows, so the two can never disagree.
-  const [view, setView] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
-  const currency = settings.defaultCurrency || '₪';
-  const lists = useLists(user?.uid, user);
-
-  // Budget always reports the *current* month, independent of the month being
-  // browsed in the expenses list below.
-  const subsMonthly = useSubsMonthly(payments, currency);
-  const budgetCategories = (lists.activeList?.groups && lists.activeList.groups.length)
-    ? lists.activeList.groups : DEFAULT_CATEGORIES;
-  const now = new Date();
-  const budgetArgs = {
-    items: lists.items,
-    income: Number(settings.monthlyIncome) || 0,
-    cap: Number(settings.monthlyCap) || 0,
-    subsMonthly, includeSubs: settings.includeSubsInBudget !== false,
-    categories: budgetCategories, categoryCaps: settings.categoryCaps || {},
-  };
-  const budgetStats = useMemo(
-    () => computeBudgetStats({ ...budgetArgs, y: view.y, m: view.m }),
-    [lists.items, settings, subsMonthly, budgetCategories.join('|'), view.y, view.m]
-  );
-  const prevBudgetStats = useMemo(() => {
-    const p = new Date(view.y, view.m - 1, 1);
-    return computeBudgetStats({ ...budgetArgs, y: p.getFullYear(), m: p.getMonth() });
-  }, [lists.items, settings, subsMonthly, budgetCategories.join('|'), view.y, view.m]);
-  const atCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
-  const shiftMonth = (delta) => setView(v => {
-    const d = new Date(v.y, v.m + delta, 1);
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <div style={{ padding: '0 18px', flexShrink: 0 }}>
-        <Header onOpenAdd={() => setAddSignal(n => n + 1)} user={user}
-          fallbackName={settings.userName} addLabel="הוסף הוצאה" />
-      </div>
-
-      <div className="hide-scroll" style={{
-        flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
-        padding: '0 18px 140px', WebkitOverflowScrolling: 'touch',
-      }}>
-        {/* Invitations to other people's trackers, if any */}
-        <PendingInvitesCard lists={lists} />
-
-        <div style={{ marginBottom: 16 }}>
-          <BudgetHeroCard stats={budgetStats} big
-            monthLabel={`${MONTH_NAMES_HE[view.m]} ${view.y}`}
-            onShiftMonth={shiftMonth} atCurrentMonth={atCurrentMonth}
-            onOpenDetail={() => setBudgetOpen(true)}
-            onOpenSettings={() => setBudgetSettingsOpen(true)} />
-        </div>
-
-        <ExpenseListSection lists={lists} settings={settings}
-          stats={budgetStats} categories={budgetCategories}
-          openAddSignal={addSignal} big />
-
-        {/* Link across to the subscriptions tab — the two stay connected. */}
-        <button onClick={onGoSubs} style={{
-          width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', gap: 13,
-          background: 'var(--surface-1)', border: 'none', cursor: 'pointer',
-          fontFamily: 'inherit', color: 'var(--ink)', textAlign: 'start',
-          borderRadius: 20, padding: '16px 18px',
-        }}>
-          <div style={{
-            width: 42, height: 42, borderRadius: 13, background: 'var(--surface-2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Icon name="repeat" size={19} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.01em' }}>מנויים ותשלומים קבועים</div>
-            <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-              {payments.length} פעילים · {fmtMoney(subsMonthly, currency)} לחודש
-            </div>
-          </div>
-          <Icon name="chevron-left" size={19} />
-        </button>
-      </div>
-
-      <BudgetDetailSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
-        stats={budgetStats} prevStats={prevBudgetStats}
-        monthLabel={`${MONTH_NAMES_HE[view.m]} ${view.y}`}
-        onOpenSettings={() => { setBudgetOpen(false); setTimeout(() => setBudgetSettingsOpen(true), 220); }} />
-      <BudgetSettingsSheet open={budgetSettingsOpen} onClose={() => setBudgetSettingsOpen(false)}
-        settings={settings} setSettings={setSettings}
-        categories={budgetCategories} subsMonthly={subsMonthly} />
-    </div>
-  );
-}
-
-// ---------- SUBSCRIPTIONS ----------
-// Recurring payments get their own tab: the totals card on top, then the full
-// stacked list filling the rest of the screen and scrolling internally.
-function SubscriptionsScreen({ payments, paymentsLoading, onOpenPayment, onOpenAdd, settings }) {
-  const [statsDetailOpen, setStatsDetailOpen] = useState(false);
-  const fx = useExchangeRates();
-  const currency = settings.defaultCurrency || '₪';
-
-  // Everything stays visible; already-paid ones sink to the bottom, dimmed.
-  const upcoming = useMemo(() => {
-    return [...payments].sort((a, b) => {
-      const pa = isAutoPaid(a), pb = isAutoPaid(b);
-      if (pa !== pb) return pa ? 1 : -1;
-      return parseISODate(statusDateISO(a)) - parseISODate(statusDateISO(b));
-    });
-  }, [payments]);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      <div style={{ padding: '0 18px', flexShrink: 0 }}>
-        <ScreenTitle title="מנויים" onOpenAdd={onOpenAdd} addLabel="הוסף תשלום"
-          sub={paymentsLoading ? null : `${upcoming.length} תשלומים קבועים`} />
-        <TotalsCard payments={payments} currency={currency} rates={fx?.rates}
-          onClick={() => setStatsDetailOpen(true)} />
-        <div style={{ height: 16 }} />
-      </div>
-
-      {paymentsLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 18px' }}>
-          <Spinner size={28} color="var(--accent)" />
-        </div>
-      ) : upcoming.length > 0 ? (
-        <StackedPaymentList payments={upcoming} onOpenDetail={onOpenPayment} />
-      ) : (
-        <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-dim)' }}>
-          <div style={{ fontSize: 15, marginBottom: 14 }}>אין עדיין מנויים</div>
-          <button onClick={onOpenAdd} style={{
-            background: 'var(--accent)', color: 'var(--accent-fg)',
-            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '12px 20px', borderRadius: 999, fontWeight: 800, fontSize: 15,
-          }}>הוסף תשלום ראשון</button>
-        </div>
-      )}
-
-      <StatsDetailSheet open={statsDetailOpen} onClose={() => setStatsDetailOpen(false)}
-        payments={payments} currency={currency} rates={fx?.rates} />
-    </div>
-  );
-}
-
-// Screen title row with an add button — used by tabs that aren't the greeting home.
-function ScreenTitle({ title, sub, onOpenAdd, addLabel }) {
-  return (
-    <div style={{ padding: '18px 0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em' }}>{title}</h1>
-        {sub && <div style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600, marginTop: 3 }}>{sub}</div>}
-      </div>
-      {onOpenAdd && (
-        <button onClick={onOpenAdd} aria-label={addLabel || 'הוסף'} style={{
-          background: 'var(--accent)', color: 'var(--accent-fg)',
-          border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 6px 18px -6px rgba(0,0,0,.35)',
-        }}>
-          <Icon name="plus" size={22} strokeWidth={2.5} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Variation A: Stacked sections
-function StackedSections({ byCycle, onOpenPayment }) {
-  return (
-    <div>
-      {CYCLE_ORDER.map(cycle => {
-        const list = byCycle[cycle];
-        if (!list.length) return null;
-        const total = list.reduce((s, p) => s + p.price, 0);
-        return (
-          <div key={cycle} style={{ marginBottom: 24 }}>
-            <SectionHeader title={CYCLE_LABEL[cycle]} count={list.length} total={total} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {list.map(p => (
-                <ListCard key={p.id} payment={p} onClick={() => onOpenPayment(p)} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Variation B: Tabbed (segmented control) single list
-function TabbedList({ rest, onOpenPayment }) {
-  const [tab, setTab] = useState('all');
-  const filtered = tab === 'all' ? rest : rest.filter(p => p.cycle === tab);
-  const total = filtered.reduce((s, p) => s + p.price, 0);
-
-  return (
-    <div>
-      <div style={{
-        display: 'flex', background: 'var(--surface-2)', borderRadius: 14, padding: 4, marginBottom: 16,
-        position: 'relative',
-      }}>
-        {[{id: 'all', label: 'הכל'}, ...CYCLE_ORDER.map(c => ({id: c, label: CYCLE_LABEL[c]}))].map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: tab === t.id ? 'var(--surface-1)' : 'transparent',
-            color: tab === t.id ? 'var(--ink)' : 'var(--ink-dim)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-            transition: 'all .15s ease',
-            boxShadow: tab === t.id ? '0 2px 8px rgba(0,0,0,.3)' : 'none',
-          }}>{t.label}</button>
-        ))}
-      </div>
-
-      <SectionHeader title="תשלומים פעילים" count={filtered.length} total={total} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: 30, textAlign: 'center', color: 'var(--ink-dim)', background: 'var(--surface-1)', borderRadius: 18, fontSize: 14 }}>
-            אין תשלומים בתדירות זו
-          </div>
-        ) : filtered.map(p => (
-          <ListCard key={p.id} payment={p} onClick={() => onOpenPayment(p)} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Variation C: Accordion sections
-function AccordionSections({ byCycle, onOpenPayment }) {
-  const [open, setOpen] = useState({ monthly: true, weekly: false, daily: false });
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {CYCLE_ORDER.map(cycle => {
-        const list = byCycle[cycle];
-        if (!list.length) return null;
-        const total = list.reduce((s, p) => s + p.price, 0);
-        const isOpen = open[cycle];
-        return (
-          <div key={cycle} style={{ background: 'var(--surface-1)', borderRadius: 20, overflow: 'hidden' }}>
-            <button onClick={() => setOpen({ ...open, [cycle]: !isOpen })} style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '16px 18px', background: 'transparent', border: 'none', cursor: 'pointer',
-              color: 'var(--ink)', fontFamily: 'inherit', textAlign: 'start',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em' }}>{CYCLE_LABEL[cycle]}</span>
-                <span style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600 }}>{list.length}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(total)}</span>
-                <span style={{ transition: 'transform .2s ease', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', display: 'inline-flex', color: 'var(--ink-dim)' }}>
-                  <Icon name="chevron-down" size={18} />
-                </span>
-              </div>
-            </button>
-            {isOpen && (
-              <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {list.map(p => (
-                  <ListCard key={p.id} payment={p} onClick={() => onOpenPayment(p)} />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Page header — uses Google profile photo when available
-function Header({ onOpenAdd, user, fallbackName, addLabel }) {
-  const displayName = user?.displayName || fallbackName || 'משתמש';
-  const photoURL = user?.photoURL;
-  const initial = (displayName || 'מ')[0];
-  return (
-    <div style={{ padding: '18px 0 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {photoURL ? (
-          <img src={photoURL} alt={displayName} referrerPolicy="no-referrer" style={{
-            width: 40, height: 40, borderRadius: '50%', objectFit: 'cover',
-            border: '1.5px solid var(--accent)',
-          }} />
-        ) : (
-          <div style={{
-            width: 40, height: 40, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, color: '#000', fontSize: 15,
-          }}>{initial}</div>
-        )}
-        <div>
-          <div style={{ fontSize: 13, color: 'var(--ink-dim)', fontWeight: 500 }}>שלום,</div>
-          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>
-            {displayName.split(' ')[0]}
-          </div>
-        </div>
-      </div>
-      <button onClick={onOpenAdd} aria-label={addLabel || 'הוסף'} style={{
-        background: 'var(--accent)', color: 'var(--accent-fg)',
-        border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-        width: 46, height: 46, borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 6px 18px -6px rgba(242,255,68,.5)',
-      }}>
-        <Icon name="plus" size={22} strokeWidth={2.5} />
-      </button>
-    </div>
-  );
-}
-
 // ---------- CALENDAR ----------
 function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
   const [cursor, setCursor] = useState(() => {
@@ -677,13 +298,17 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 }
 
 // ---------- SETTINGS ----------
-function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSignOut, onOpenUpdates }) {
+function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates }) {
   const [version, setVersion] = useState(null);
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
   const toast = useToast();
   const [notifPerm, setNotifPerm] = useState(() => notifPermission());
   const [testBusy, setTestBusy] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const currency = settings.defaultCurrency || '₪';
+  const subsMonthly = useSubsMonthly(payments, currency);
 
   const notifTimings = [
     { id: 'week',  label: 'שבוע לפני' },
@@ -697,11 +322,11 @@ function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSign
     const perm = await ensureNotifPermission();
     setNotifPerm(perm);
     if (perm === 'unsupported') {
-      toast('הדפדפן לא תומך בהתראות', { type: 'error' });
+      toast('המכשיר לא תומך בהתראות', { type: 'error' });
       setTestBusy(false); return;
     }
     if (perm !== 'granted') {
-      toast('יש לאשר הרשאת התראות בדפדפן', { type: 'error' });
+      toast('יש לאשר הרשאת התראות', { type: 'error' });
       setTestBusy(false); return;
     }
     // Register FCM token so the server can push (idempotent)
@@ -717,232 +342,149 @@ function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSign
   };
 
   const isAnon = user?.isAnonymous;
-  const displayName = user?.displayName || settings.userName || 'משתמש אנונימי';
+  const displayName = user?.displayName || settings.userName || 'משתמש';
   const email = user?.email;
   const photoURL = user?.photoURL;
+  const cap = Number(settings.monthlyCap) || 0;
+  const members = (lists.activeList?.members || []).length;
+  const chevron = <Icon name="chevron-left" size={18} />;
 
   return (
     <div style={{ padding: '18px 18px 120px' }}>
-      <h1 style={{ margin: '8px 0 24px', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>הגדרות</h1>
+      <h1 style={{ margin: '0 0 16px', fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>הגדרות</h1>
 
       {/* Profile — Google data when signed in with Google, otherwise editable name */}
-      <div style={{ background: 'var(--surface-1)', borderRadius: 20, padding: 18, marginBottom: 18, display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="rise" style={{ background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', borderRadius: 26, padding: 16, marginBottom: 22, display: 'flex', alignItems: 'center', gap: 14 }}>
         {photoURL ? (
-          <img src={photoURL} alt={displayName} referrerPolicy="no-referrer" style={{
-            width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
-            border: '2px solid var(--accent)', flexShrink: 0,
+          <img src={photoURL} alt="" referrerPolicy="no-referrer" style={{
+            width: 60, height: 60, borderRadius: '50%', objectFit: 'cover',
+            border: '2.5px solid var(--stroke)', flexShrink: 0,
           }} />
         ) : (
           <div style={{
-            width: 56, height: 56, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000))',
+            width: 60, height: 60, borderRadius: '50%', background: 'var(--peach)', border: '2.5px solid var(--stroke)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, color: '#000', fontSize: 22, flexShrink: 0,
+            fontWeight: 900, fontSize: 24, flexShrink: 0,
           }}>{(displayName || 'מ')[0]}</div>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           {user?.displayName ? (
-            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
             </div>
           ) : (
             <input value={settings.userName} onChange={e => update({ userName: e.target.value })}
-              placeholder="השם שלך" style={{
+              placeholder="השם שלך" aria-label="השם שלך" style={{
               width: '100%', background: 'transparent', border: 'none', outline: 'none',
-              color: 'var(--ink)', fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', fontFamily: 'inherit', padding: 0,
+              color: 'var(--ink)', fontSize: 20, fontWeight: 800, fontFamily: 'inherit', padding: 0,
             }} />
           )}
-          <div style={{ fontSize: 12, color: 'var(--ink-dim)', marginTop: 2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-dim)', marginTop: 3, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {isAnon ? 'מחובר ללא חשבון' : (email || 'החשבון שלי')}
           </div>
         </div>
-        <IconButton name="close" size={36} iconSize={16} onClick={onSignOut} ariaLabel="התנתק" />
       </div>
 
-      {/* Notifications group */}
-      <SettingsGroup title="התראות">
-        <Row icon="bell" label="קבלת התראות" sub="התראות פוש על תשלומים קרובים"
-          right={<Toggle checked={settings.notif} onChange={v => update({ notif: v })} />} />
-
-        <div style={{ padding: '4px 18px 14px' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>מתי להתריע</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {notifTimings.map(t => (
-              <Chip key={t.id} active={settings.notifTimings.includes(t.id)} onClick={() => {
-                const has = settings.notifTimings.includes(t.id);
-                update({ notifTimings: has ? settings.notifTimings.filter(x => x !== t.id) : [...settings.notifTimings, t.id] });
-              }}>{t.label}</Chip>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: '4px 18px 14px', borderTop: '1px solid var(--divider)', paddingTop: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>שעה ביום</div>
-          <input type="time" value={settings.notifTime} onChange={e => update({ notifTime: e.target.value })} style={{
-            background: 'var(--surface-2)', border: 'none', outline: 'none',
-            color: 'var(--ink)', fontSize: 17, fontWeight: 700, fontFamily: 'inherit',
-            padding: '10px 14px', borderRadius: 12, fontVariantNumeric: 'tabular-nums',
-          }} />
-        </div>
-
-        <Row icon="card" label="סיכום חודשי" sub="קבל סיכום בתחילת כל חודש"
-          right={<Toggle checked={settings.monthlySummary} onChange={v => update({ monthlySummary: v })} />} />
-
-        {/* Permission state + test notification */}
-        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--divider)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>הרשאת התראות</div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 2 }}>
-                {notifPerm === 'granted' ? 'מאושרת ✓' :
-                 notifPerm === 'denied'  ? 'נדחתה — שנה בהגדרות הדפדפן' :
-                 notifPerm === 'unsupported' ? 'לא נתמך בדפדפן זה' :
-                 'נדרשת הרשאה'}
-              </div>
-            </div>
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
-              background: notifPerm === 'granted' ? 'rgba(34,197,94,.18)' :
-                          notifPerm === 'denied' ? 'rgba(255,92,92,.18)' : 'var(--surface-2)',
-              color: notifPerm === 'granted' ? '#22C55E' :
-                     notifPerm === 'denied' ? '#FF5C5C' : 'var(--ink-dim)',
-            }}>
-              {notifPerm === 'granted' ? 'פעיל' : notifPerm === 'denied' ? 'חסום' : 'ממתין'}
-            </span>
-          </div>
-          <button onClick={sendTestNotification} disabled={testBusy} style={{
-            width: '100%', padding: '12px 14px', borderRadius: 12, border: 'none', cursor: testBusy ? 'wait' : 'pointer',
-            background: 'var(--accent)', color: 'var(--accent-fg)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            opacity: testBusy ? .7 : 1,
-          }}>
-            {testBusy ? <Spinner size={14} color="var(--accent-fg)" /> : <Icon name="bell" size={15} strokeWidth={2.4} />}
-            שלח התראת בדיקה
-          </button>
-        </div>
-      </SettingsGroup>
-
-      {/* Appearance group */}
-      <SettingsGroup title="עיצוב ושפה">
-        <Row icon={settings.theme === 'dark' ? 'moon' : 'sun'} label="ערכת נושא"
-          right={
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Chip active={settings.theme === 'dark'} onClick={() => update({ theme: 'dark' })}>כהה</Chip>
-              <Chip active={settings.theme === 'light'} onClick={() => update({ theme: 'light' })}>בהיר</Chip>
-            </div>
-          } />
-
-        {/* Accent color picker — swatch grid */}
-        <div style={{ padding: '14px 18px', borderTop: '1px solid var(--divider)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--ink)',
-              }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', background: accent }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>צבע הדגשה</div>
-                <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2 }}>{ACCENT_PALETTE.find(p => p.color === accent)?.label || 'מותאם'}</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 8 }}>
-            {ACCENT_PALETTE.map(p => {
-              const isActive = accent === p.color;
-              return (
-                <button key={p.id} onClick={() => setAccent(p.color)} aria-label={p.label} style={{
-                  aspectRatio: '1 / 1', width: '100%',
-                  borderRadius: '50%', cursor: 'pointer',
-                  background: p.color, border: 'none',
-                  outline: isActive ? '2.5px solid var(--ink)' : '2.5px solid transparent',
-                  outlineOffset: 2,
-                  transform: isActive ? 'scale(1)' : 'scale(.92)',
-                  transition: 'transform .18s ease, outline-color .18s ease',
-                }} />
-              );
-            })}
-          </div>
-          {/* Free custom color */}
-          <label style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginTop: 14, padding: '10px 14px', borderRadius: 12, background: 'var(--surface-2)',
-            cursor: 'pointer',
-          }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>צבע חופשי</span>
-            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-dim)', fontVariantNumeric: 'tabular-nums' }}>{accent.toUpperCase()}</span>
-              <span style={{
-                width: 28, height: 28, borderRadius: '50%', background: accent,
-                outline: '2px solid var(--divider)',
-              }} />
-              <input type="color" value={accent} onChange={e => setAccent(e.target.value)} style={{
-                position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer',
-              }} />
-            </span>
-          </label>
-        </div>
-
-        <Row icon="globe" label="שפה"
-          right={
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Chip active={settings.language === 'he'} onClick={() => update({ language: 'he' })}>עברית</Chip>
-              <Chip active={settings.language === 'en'} onClick={() => update({ language: 'en' })}>EN</Chip>
-            </div>
-          } />
-        <Row icon="shekel" label="מטבע ברירת מחדל"
+      <SettingsGroup title="כסף">
+        <Row icon="card" tint="var(--mint)" label="תקציב חודשי"
+          sub={cap > 0 ? `${fmtMoney(cap, currency)} לחודש` : 'לא הוגדר'}
+          onClick={() => setBudgetOpen(true)} right={chevron} />
+        <Row icon="user" tint="var(--lavender)" label="מעקבים ושיתוף"
+          sub={`${lists.activeList?.name || 'ההוצאות שלי'}${members > 1 ? ` · ${members} משתתפים` : ''}`}
+          onClick={() => setManageOpen(true)} right={chevron} />
+        <Row icon="shekel" tint="var(--butter)" label="מטבע"
           right={
             <div style={{ display: 'flex', gap: 4 }}>
               {CURRENCIES.map(c => (
-                <Chip key={c} active={settings.defaultCurrency === c} onClick={() => update({ defaultCurrency: c })}>{c}</Chip>
+                <Chip key={c} active={currency === c} onClick={() => update({ defaultCurrency: c })} style={{ padding: '7px 11px' }}>{c}</Chip>
               ))}
             </div>
           } />
       </SettingsGroup>
 
-      {/* Data group */}
-      <SettingsGroup title="נתונים">
-        <Row icon="download" label="ייצוא לקובץ CSV" sub="כל התשלומים והיסטוריה"
-          onClick={() => toast('ייצוא CSV יתווסף בהמשך', { type: 'info' })}
-          right={<Icon name="chevron-left" size={18} />} />
-        <Row icon="download" label="ייצוא לקובץ PDF" sub="דוח מסודר להדפסה"
-          onClick={() => toast('ייצוא PDF יתווסף בהמשך', { type: 'info' })}
-          right={<Icon name="chevron-left" size={18} />} />
+      <SettingsGroup title="התראות">
+        <Row icon="bell" tint="var(--butter)" label="תזכורות לתשלומים" sub="לפני כל חיוב של מנוי"
+          right={<Toggle checked={settings.notif} onChange={v => update({ notif: v })} />} />
+        {settings.notif && (
+          <div style={{ padding: '4px 16px 14px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {notifTimings.map(t => (
+                <Chip key={t.id} active={settings.notifTimings.includes(t.id)} onClick={() => {
+                  const has = settings.notifTimings.includes(t.id);
+                  update({ notifTimings: has ? settings.notifTimings.filter(x => x !== t.id) : [...settings.notifTimings, t.id] });
+                }}>{t.label}</Chip>
+              ))}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+              <span style={{ fontSize: 14.5, fontWeight: 600 }}>שעה ביום</span>
+              <input type="time" value={settings.notifTime} onChange={e => update({ notifTime: e.target.value })} style={{
+                background: 'var(--surface-2)', border: 'none', outline: 'none',
+                color: 'var(--ink)', fontSize: 16, fontWeight: 700, fontFamily: 'inherit',
+                padding: '9px 14px', borderRadius: 12, fontVariantNumeric: 'tabular-nums',
+              }} />
+            </label>
+          </div>
+        )}
+        <Row icon="history" tint="var(--sky)" label="סיכום חודשי" sub="בתחילת כל חודש"
+          right={<Toggle checked={settings.monthlySummary} onChange={v => update({ monthlySummary: v })} />} />
+        <div style={{ padding: '12px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-dim)', fontWeight: 600 }}>
+            {notifPerm === 'granted' ? 'הרשאה: מאושרת ✓' :
+             notifPerm === 'denied'  ? 'הרשאה: חסומה — אפשר בהגדרות המכשיר' :
+             notifPerm === 'unsupported' ? 'המכשיר לא תומך בהתראות' : 'הרשאה: טרם אושרה'}
+          </div>
+          <button onClick={sendTestNotification} disabled={testBusy} className="press" style={{
+            padding: '10px 14px', borderRadius: 14, border: 'none', cursor: testBusy ? 'wait' : 'pointer',
+            background: 'var(--surface-2)', color: 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
+            display: 'flex', alignItems: 'center', gap: 6, opacity: testBusy ? .7 : 1, flexShrink: 0,
+          }}>
+            {testBusy ? <Spinner size={14} /> : <Icon name="bell" size={15} strokeWidth={2.4} />}
+            בדיקה
+          </button>
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup title="מראה">
+        <div style={{ padding: 12 }}>
+          <Segmented
+            options={[{ id: 'system', label: 'אוטומטי' }, { id: 'light', label: 'בהיר' }, { id: 'dark', label: 'כהה' }]}
+            value={settings.theme || 'system'} onChange={(v) => update({ theme: v })} />
+        </div>
       </SettingsGroup>
 
       {isNative && (
         <SettingsGroup title="עדכונים">
-          <Row icon="download" label="בדוק עדכונים" sub={version ? `גרסה ${version.name}` : ''}
-            onClick={onOpenUpdates} right={<Icon name="chevron-left" size={16} />} />
+          <Row icon="download" tint="var(--mint)" label="בדוק עדכונים" sub={version ? `גרסה ${version.name}` : ''}
+            onClick={onOpenUpdates} right={chevron} />
         </SettingsGroup>
       )}
 
-      {/* Account group */}
       <SettingsGroup title="חשבון">
-        <Row icon="arrow-right" label="התנתקות" sub={email || 'יציאה מהחשבון'} danger onClick={onSignOut} />
+        <Row icon="arrow-right" tint="var(--danger-soft)" label="התנתקות" sub={email || 'יציאה מהחשבון'} danger onClick={onSignOut} />
       </SettingsGroup>
 
-      <div style={{ textAlign: 'center', color: 'var(--ink-dim)', fontSize: 12, marginTop: 28 }}>
+      <div style={{ textAlign: 'center', color: 'var(--ink-dim)', fontSize: 12.5, fontWeight: 600, marginTop: 8 }}>
         תשלומים{version ? ` · גרסה ${version.name}` : ''}
       </div>
+
+      <BudgetSettingsSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
+        settings={settings} setSettings={setSettings} categories={categories} subsMonthly={subsMonthly} />
+      <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
     </div>
   );
 }
 
 function SettingsGroup({ title, children }) {
+  const items = React.Children.toArray(children).filter(Boolean);
   return (
-    <div style={{ marginBottom: 22 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-dim)', letterSpacing: '0.08em', padding: '0 6px 8px', textTransform: 'uppercase' }}>
+    <div className="rise" style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink-dim)', padding: '0 6px 8px' }}>
         {title}
       </div>
-      <div style={{ background: 'var(--surface-1)', borderRadius: 20, overflow: 'hidden' }}>
-        {React.Children.map(children, (child, i) => (
-          <div style={{ borderBottom: i < React.Children.count(children) - 1 ? '1px solid var(--divider)' : 'none' }}>
+      <div style={{ background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', borderRadius: 24, overflow: 'hidden' }}>
+        {items.map((child, i) => (
+          <div key={i} style={{ borderTop: i ? '1px solid var(--divider)' : 'none' }}>
             {child}
           </div>
         ))}
@@ -951,4 +493,4 @@ function SettingsGroup({ title, children }) {
   );
 }
 
-export { CalendarScreen, HomeScreen, ScreenTitle, SettingsScreen, SubscriptionsScreen };
+export { CalendarScreen, SettingsScreen, StatsDetailSheet };

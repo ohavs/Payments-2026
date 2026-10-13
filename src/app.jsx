@@ -1,38 +1,67 @@
-// Main app shell — auth gate, state, theme, navigation, mounts screens & sheets.
-import React, { useEffect, useState } from 'react';
+// Main app shell — auth gate, theme, tabs, the + button and app-wide sheets.
+import React, { useEffect, useMemo, useState } from 'react';
 import { LoginScreen } from './auth.jsx';
-import { Icon } from './components.jsx';
 import { FeedbackProvider, FullScreenLoader, useConfirm, useToast } from './feedback.jsx';
 import { useAuthUser, useFirebaseSettings, usePayments } from './firebase-init.jsx';
-import { CalendarScreen, HomeScreen, SettingsScreen, SubscriptionsScreen } from './screens.jsx';
-import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
-import { TweakColor, TweakRadio, TweakSection, TweaksPanel, useTweaks } from './tweaks-panel.jsx';
+import { DEFAULT_CATEGORIES, useLists } from './lists.jsx';
 import { notifPermission, registerFcmToken, scanForReminders } from './notifications.jsx';
+import { QuickAddSheet } from './quick-add.jsx';
+import { ExpensesScreen } from './screens/expenses.jsx';
+import { SubscriptionsScreen } from './screens/subscriptions.jsx';
+import { SettingsScreen } from './screens.jsx';
+import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
+import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
-import { setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
+import { haptic, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
 import { checkForUpdateQuietly } from './lib/updater.js';
 
+// 'system' follows the phone; 'light' / 'dark' are explicit choices.
+function useTheme(pref) {
+  const query = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const [systemDark, setSystemDark] = useState(() => !!query?.matches);
+  useEffect(() => {
+    if (!query) return;
+    const onChange = (e) => setSystemDark(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  const dark = pref === 'dark' || ((!pref || pref === 'system') && systemDark);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.dir = 'rtl';
+    root.lang = 'he';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0F0F11' : '#F6F6F3');
+    setStatusBarTheme(dark);
+  }, [dark]);
+}
+
 function AppInner() {
-  const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
   const { user, loading: authLoading, signInGoogle, signInAnonymous, signOut } = useAuthUser();
   const toast = useToast();
   const confirm = useConfirm();
 
-  // App state — payments + settings come from Firestore, scoped to user.uid
+  // Firestore data, scoped to the signed-in user.
   const [payments, paymentOps, { loading: paymentsLoading }] = usePayments(user?.uid);
   const [settings, setSettings, { loading: settingsLoading }] = useFirebaseSettings(user?.uid, user?.displayName);
+  const lists = useLists(user?.uid, user);
+  const categories = lists.activeList?.groups?.length ? lists.activeList.groups : DEFAULT_CATEGORIES;
 
-  const [tab, setTab] = useState('home');
+  const [tab, setTab] = useState('expenses');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickCategory, setQuickCategory] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const [addSubOpen, setAddSubOpen] = useState(false);
   const [editCustom, setEditCustom] = useState(null);
   const [update, setUpdate] = useState(null);       // latest release info, when newer
   const [updateOpen, setUpdateOpen] = useState(false);
 
-  // Android back with no sheet open: other tab → home tab → exit app.
+  useTheme(user ? settings.theme : 'system');
+
+  // Android back with no sheet open: other tab → expenses tab → exit app.
   useEffect(() => {
     setBaseBackHandler(() => {
-      if (tab !== 'home') { setTab('home'); return true; }
+      if (tab !== 'expenses') { setTab('expenses'); return true; }
       return false;
     });
   }, [tab]);
@@ -42,35 +71,6 @@ function AppInner() {
     if (!user) return;
     checkForUpdateQuietly().then((r) => { if (r?.available) setUpdate(r); });
   }, [user?.uid]);
-
-  // Apply theme + accent via CSS vars
-  useEffect(() => {
-    const root = document.documentElement;
-    const dark = t.theme === 'dark';
-    root.style.setProperty('--bg', dark ? '#0B0B0B' : '#F4F4F2');
-    root.style.setProperty('--surface-1', dark ? '#161616' : '#FFFFFF');
-    root.style.setProperty('--surface-2', dark ? '#222222' : '#EFEFEC');
-    root.style.setProperty('--surface-3', dark ? '#2E2E2E' : '#E2E2DE');
-    root.style.setProperty('--ink', dark ? '#FAFAFA' : '#0B0B0B');
-    root.style.setProperty('--ink-dim', dark ? '#8A8A8A' : '#6B6B6B');
-    root.style.setProperty('--divider', dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)');
-    root.style.setProperty('--accent', t.accent);
-    root.style.setProperty('--accent-fg', '#0B0B0B');
-    root.style.setProperty('--chip-bg', dark ? '#222222' : '#EFEFEC');
-    root.style.setProperty('--chip-fg', dark ? '#FAFAFA' : '#0B0B0B');
-    root.style.setProperty('--glass-border', dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)');
-    // Update PWA theme color to match
-    let meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#0B0B0B' : '#F4F4F2');
-    setStatusBarTheme(dark);
-    document.documentElement.dir = 'rtl';
-    document.documentElement.lang = 'he';
-  }, [t.theme, t.accent]);
-
-  // Sync settings.theme → tweak.theme
-  useEffect(() => {
-    if (settings.theme && settings.theme !== t.theme) setTweak('theme', settings.theme);
-  }, [settings.theme]);
 
   // On payments/settings change, scan for upcoming reminders
   useEffect(() => {
@@ -82,13 +82,20 @@ function AppInner() {
   // (handles new device, token expiry, etc.)
   useEffect(() => {
     if (!user || settingsLoading) return;
-    if (notifPermission() === 'granted') {
-      registerFcmToken(user.uid);
-    }
+    if (notifPermission() === 'granted') registerFcmToken(user.uid);
   }, [user?.uid, settingsLoading]);
 
+  // Titles used recently — one-tap fill in quick add.
+  const recentTitles = useMemo(() => {
+    const seen = [];
+    lists.items.forEach((it) => {
+      const t = (it.title || '').trim();
+      if (t && !seen.includes(t)) seen.push(t);
+    });
+    return seen.slice(0, 8);
+  }, [lists.items]);
+
   // Handlers — write through to Firestore + toast feedback
-  const openPayment = (p) => setDetail(p);
   const savePayment = async (p) => {
     try { await paymentOps.update(p); toast('השינויים נשמרו', { type: 'success' }); }
     catch (e) { toast('שגיאה בשמירה', { type: 'error' }); }
@@ -98,9 +105,16 @@ function AppInner() {
     catch (e) { toast('שגיאה במחיקה', { type: 'error' }); }
   };
   const addPayment = async (p) => {
-    try { await paymentOps.add(p); toast('התשלום נוסף', { type: 'success' }); }
+    try { await paymentOps.add(p); toast('המנוי נוסף', { type: 'success' }); }
     catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
+  const addExpense = async (item) => {
+    try {
+      await lists.ops.addItem(lists.activeListId, item);
+      haptic('success');
+    } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
+  };
+  const openQuickAdd = (category = null) => { haptic('press'); setQuickCategory(category); setQuickOpen(true); };
   const handleSignOut = async () => {
     const ok = await confirm({
       title: 'התנתקות',
@@ -112,82 +126,80 @@ function AppInner() {
     catch (e) { toast('שגיאה בהתנתקות', { type: 'error' }); }
   };
 
-  if (authLoading) return <FullScreenLoader label="טוען..." />;
+  if (authLoading) return <FullScreenLoader />;
   if (!user) return <LoginScreen onSignInGoogle={signInGoogle} onSignInAnonymous={signInAnonymous} />;
 
   return (
     <div style={{
       width: '100%', minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)',
-      position: 'relative', display: 'flex', justifyContent: 'center',
+      display: 'flex', justifyContent: 'center',
     }}>
       <div style={{
         width: '100%', maxWidth: 480, height: '100vh', position: 'relative',
         background: 'var(--bg)', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
         // Android draws edge-to-edge: keep content clear of the status bar.
         paddingTop: 'env(safe-area-inset-top)',
-        display: 'flex', flexDirection: 'column',
       }} data-screen-label={`tab: ${tab}`}>
-        <div className="bg-orbs" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
-        <div style={{
-          flex: 1, minHeight: 0,
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          // home + subs manage their own internal scrolling
-          overflowY: (tab === 'home' || tab === 'subs') ? 'hidden' : 'auto',
-          overflowX: 'hidden',
+        <main key={tab} className="screen-in hide-scroll" style={{
+          flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         }}>
-        {tab === 'home' && (
-          <HomeScreen
-            user={user}
-            payments={payments}
-            settings={settings}
-            setSettings={setSettings}
-            onGoSubs={() => setTab('subs')}
-          />
-        )}
-        {tab === 'subs' && (
-          <SubscriptionsScreen
-            payments={payments}
-            paymentsLoading={paymentsLoading}
-            onOpenPayment={openPayment}
-            onOpenAdd={() => setAddOpen(true)}
-            settings={settings}
-          />
-        )}
-        {tab === 'calendar' && (
-          <CalendarScreen
-            payments={payments}
-            onOpenPayment={openPayment}
-            onOpenAdd={() => setAddOpen(true)}
-          />
-        )}
-        {tab === 'settings' && (
-          <SettingsScreen
-            user={user}
-            settings={settings}
-            setSettings={setSettings}
-            accent={t.accent}
-            setAccent={v => setTweak('accent', v)}
-            onSignOut={handleSignOut}
-            onOpenUpdates={() => setUpdateOpen(true)}
-          />
-        )}
-        </div>
+          {tab === 'expenses' && (
+            <ExpensesScreen
+              lists={lists}
+              categories={categories}
+              payments={payments}
+              settings={settings}
+              setSettings={setSettings}
+              onQuickAdd={openQuickAdd}
+            />
+          )}
+          {tab === 'subs' && (
+            <SubscriptionsScreen
+              payments={payments}
+              loading={paymentsLoading}
+              settings={settings}
+              onOpenPayment={(p) => setDetail(p)}
+              onOpenAdd={() => setAddSubOpen(true)}
+            />
+          )}
+          {tab === 'settings' && (
+            <SettingsScreen
+              user={user}
+              settings={settings}
+              setSettings={setSettings}
+              lists={lists}
+              categories={categories}
+              payments={payments}
+              onSignOut={handleSignOut}
+              onOpenUpdates={() => setUpdateOpen(true)}
+            />
+          )}
+        </main>
 
         {update && !updateOpen && (
-          <button onClick={() => setUpdateOpen(true)} style={{
+          <button onClick={() => setUpdateOpen(true)} className="rise" style={{
             position: 'absolute', top: 'calc(10px + env(safe-area-inset-top))', left: '50%', transform: 'translateX(-50%)',
-            zIndex: 60, border: 'none', cursor: 'pointer', borderRadius: 999, padding: '9px 16px',
+            zIndex: 60, border: 'none', cursor: 'pointer', borderRadius: 999, padding: '10px 18px',
             background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-            boxShadow: '0 10px 24px -8px rgba(0,0,0,.35)', whiteSpace: 'nowrap',
+            boxShadow: 'var(--shadow-float)', whiteSpace: 'nowrap',
           }}>
             גרסה {update.latest.versionName} זמינה · עדכן
           </button>
         )}
 
-        <BottomNav tab={tab} setTab={setTab} onAdd={() => setAddOpen(true)} />
+        <TabBar tab={tab} setTab={setTab} onAdd={() => openQuickAdd()} addOpen={quickOpen} />
 
+        <QuickAddSheet
+          open={quickOpen}
+          onClose={() => setQuickOpen(false)}
+          categories={categories}
+          defaultCategory={quickCategory}
+          recentTitles={recentTitles}
+          canSave={!!lists.activeListId}
+          onAdd={addExpense}
+          onAddSubscription={() => { setQuickOpen(false); setTimeout(() => setAddSubOpen(true), 260); }}
+        />
         <DetailSheet
           payment={detail}
           open={!!detail}
@@ -196,10 +208,9 @@ function AppInner() {
           onDelete={deletePayment}
           onEditCustom={(p) => { setDetail(null); setEditCustom(p); }}
         />
-        <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
         <AddSheet
-          open={addOpen}
-          onClose={() => setAddOpen(false)}
+          open={addSubOpen}
+          onClose={() => setAddSubOpen(false)}
           onAdd={addPayment}
         />
         <EditCustomSheet
@@ -208,17 +219,8 @@ function AppInner() {
           onClose={() => setEditCustom(null)}
           onSave={(p) => { savePayment(p); setEditCustom(null); }}
         />
+        <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
       </div>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Appearance" />
-        <TweakRadio label="Theme" value={t.theme}
-          options={['dark', 'light']}
-          onChange={v => setTweak('theme', v)} />
-        <TweakColor label="Accent" value={t.accent}
-          options={['#F2FF44', '#A3FF6A', '#FF8A4C', '#7C5CFF']}
-          onChange={v => setTweak('accent', v)} />
-      </TweaksPanel>
     </div>
   );
 }
@@ -231,39 +233,52 @@ function App() {
   );
 }
 
-function BottomNav({ tab, setTab, onAdd }) {
-  const items = [
-    { id: 'home', icon: 'home', label: 'הוצאות' },
-    { id: 'subs', icon: 'repeat', label: 'מנויים' },
-    { id: 'calendar', icon: 'calendar', label: 'לוח' },
-    { id: 'settings', icon: 'settings', label: 'הגדרות' },
-  ];
+// Bottom bar: הוצאות · מנויים · (+) · הגדרות. Inactive icons go grey; the
+// active one pops in colour with a dot under its label.
+function TabBar({ tab, setTab, onAdd, addOpen }) {
+  const item = (id, label) => {
+    const on = tab === id;
+    return (
+      <button key={id} onClick={() => { if (!on) { haptic('tap'); setTab(id); } }} aria-label={label}
+        aria-current={on ? 'page' : undefined} style={{
+          flex: 1, border: 'none', background: 'transparent', padding: '10px 0 0', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, fontFamily: 'inherit',
+        }}>
+        <span key={on ? 'on' : 'off'} className={on ? 'pop' : undefined} style={{ display: 'flex' }}>
+          <NavIcon name={id} active={on} size={28} />
+        </span>
+        <span style={{ fontSize: 12.5, fontWeight: on ? 800 : 600, color: on ? 'var(--ink)' : 'var(--ink-dim)' }}>{label}</span>
+        <span style={{
+          width: 5, height: 5, borderRadius: '50%', background: 'var(--ink)',
+          transform: on ? 'scale(1)' : 'scale(0)', transition: 'transform .3s cubic-bezier(.34,1.56,.64,1)',
+        }} />
+      </button>
+    );
+  };
   return (
-    <div style={{
-      position: 'fixed', bottom: 'calc(16px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
-      width: 'calc(100% - 32px)', maxWidth: 448, zIndex: 50,
-      background: 'var(--accent)',
-      borderRadius: 999, padding: 6,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
-      boxShadow: '0 12px 30px -10px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.05)',
+    <nav aria-label="ניווט ראשי" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 50,
+      background: 'var(--surface-1)', borderRadius: '28px 28px 0 0',
+      boxShadow: '0 -8px 30px rgba(20,20,20,.08)',
+      display: 'flex', alignItems: 'flex-start', padding: '0 8px',
+      height: 'calc(78px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
-      {items.map(item => {
-        const active = tab === item.id;
-        return (
-          <button key={item.id} onClick={() => setTab(item.id)} style={{
-            flex: 1, padding: '10px 12px', borderRadius: 999, border: 'none', cursor: 'pointer',
-            background: active ? '#0B0B0B' : 'transparent',
-            color: active ? 'var(--accent)' : '#000',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            transition: 'all .18s ease',
-          }}>
-            <Icon name={item.icon} size={18} strokeWidth={active ? 2.4 : 2} />
-            {active && <span>{item.label}</span>}
-          </button>
-        );
-      })}
-    </div>
+      {item('expenses', 'הוצאות')}
+      {item('subs', 'מנויים')}
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+        <button onClick={onAdd} aria-label="הוספת הוצאה" className="btn-primary" style={{
+          width: 64, height: 64, marginTop: -24, borderRadius: '50%', borderWidth: 3, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ display: 'flex', transform: addOpen ? 'rotate(45deg)' : 'none', transition: 'transform .45s cubic-bezier(.34,1.56,.64,1)' }}>
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+              <path d="M12 4.5v15M4.5 12h15" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+            </svg>
+          </span>
+        </button>
+      </div>
+      {item('settings', 'הגדרות')}
+    </nav>
   );
 }
 

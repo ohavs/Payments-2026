@@ -98,7 +98,7 @@ const DEFAULT_SETTINGS = {
   notifTimings: ['three', 'day'],
   notifTime: '09:00',
   monthlySummary: true,
-  theme: 'light',
+  theme: 'system',
   language: 'he',
   defaultCurrency: '₪',
   // Budget tool: monthly income + a spending ceiling for tracked expenses.

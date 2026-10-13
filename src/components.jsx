@@ -19,6 +19,7 @@ function ServiceBubble({ service, size = 44, dark = false }) {
     return (
       <div style={{
         width: size, height: size, borderRadius: '50%',
+        border: '2px solid var(--stroke)',
         background: service.bg || '#222',
         backgroundImage: `url(${service.image})`,
         backgroundSize: 'cover', backgroundPosition: 'center',
@@ -30,9 +31,10 @@ function ServiceBubble({ service, size = 44, dark = false }) {
     <div style={{
       width: size, height: size, borderRadius: '50%',
       background: service.bg, color: service.fg,
+      border: '2px solid var(--stroke)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontWeight: 800, fontSize: size * 0.42, flexShrink: 0,
-      lineHeight: 1, fontFamily: 'system-ui, sans-serif',
+      fontWeight: 800, fontSize: size * 0.4, flexShrink: 0,
+      lineHeight: 1, fontFamily: 'inherit',
     }}>{service.glyph}</div>
   );
 }
@@ -79,10 +81,10 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2 }) {
 function Chip({ active, children, onClick, color, bg, style }) {
   return (
     <button onClick={onClick} className="chip" style={{
-      padding: '8px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
-      fontFamily: 'inherit', fontWeight: 600, fontSize: 13,
-      background: active ? (bg || 'var(--accent)') : 'var(--chip-bg)',
-      color: active ? (color || 'var(--accent-fg)') : 'var(--chip-fg)',
+      padding: '9px 15px', borderRadius: 999, border: 'none', cursor: 'pointer',
+      fontFamily: 'inherit', fontWeight: 700, fontSize: 13.5,
+      background: active ? (bg || 'var(--ink)') : 'var(--chip-bg)',
+      color: active ? (color || 'var(--bg)') : 'var(--chip-fg)',
       whiteSpace: 'nowrap',
       transition: 'all .15s ease',
       ...style,
@@ -183,7 +185,7 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
   }, [open, onClose]);
 
   const translate = open ? `translateY(${dragY}px)` : 'translateY(100%)';
-  const panelTransition = dragging ? 'none' : (animReady ? 'transform .32s cubic-bezier(.22,.61,.36,1)' : 'none');
+  const panelTransition = dragging ? 'none' : (animReady ? 'transform .45s cubic-bezier(.22,1,.36,1)' : 'none');
 
   return (
     <div style={{
@@ -192,49 +194,48 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
     }}>
       <div onClick={onClose} style={{
         position: 'absolute', inset: 0,
-        background: 'rgba(0,0,0,.55)',
+        background: 'rgba(15,15,17,.42)',
         opacity: open ? Math.max(0, 1 - dragY / 500) : 0,
-        transition: dragging ? 'none' : (animReady ? 'opacity .25s ease' : 'none'),
+        transition: dragging ? 'none' : (animReady ? 'opacity .3s ease' : 'none'),
       }} />
       <div ref={panelRef} style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
         height: height,
         background: 'var(--surface-1)',
         color: 'var(--ink)',
-        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        borderTopLeftRadius: 30, borderTopRightRadius: 30,
         transform: translate,
         transition: panelTransition,
         display: 'flex', flexDirection: 'column',
-        boxShadow: '0 -20px 50px rgba(0,0,0,.3)',
+        // Closed sheets wait just below the screen; without this their shadow
+        // bleeds up into view as a dark band behind the tab bar.
+        boxShadow: open ? '0 -16px 40px rgba(0,0,0,.16)' : 'none',
         touchAction: 'pan-y',
       }}>
         {/* Sticky header: handle + title + close */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 5,
           background: 'var(--surface-1)',
-          borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          borderTopLeftRadius: 30, borderTopRightRadius: 30,
         }}>
           {/* Tappable drag handle that also closes */}
           <button onClick={onClose} aria-label="סגור" style={{
             width: '100%', display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 6,
             background: 'transparent', border: 'none', cursor: 'pointer',
           }}>
-            <div style={{ width: 44, height: 5, borderRadius: 999, background: 'var(--divider)' }} />
+            <div style={{ width: 44, height: 5, borderRadius: 999, background: 'var(--surface-3)' }} />
           </button>
           {title && (
             <div style={{
-              padding: '6px 22px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              borderBottom: '1px solid var(--divider)',
+              padding: '4px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>{title}</h2>
-              <button onClick={onClose} aria-label="סגור" style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              <h2 style={{ margin: 0, fontSize: 23, fontWeight: 800, letterSpacing: '-0.02em' }}>{title}</h2>
+              <button onClick={onClose} aria-label="סגור" className="press" style={{
+                width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: 'pointer',
                 background: 'var(--surface-2)', color: 'var(--ink)',
-                fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
-                <Icon name="close" size={16} strokeWidth={2.4} />
-                סגור
+                <Icon name="close" size={18} strokeWidth={2.4} />
               </button>
             </div>
           )}
@@ -250,47 +251,50 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
 // Toggle switch
 function Toggle({ checked, onChange }) {
   return (
-    <button onClick={() => onChange(!checked)} style={{
-      width: 50, height: 30, borderRadius: 999, border: 'none', cursor: 'pointer',
+    <button role="switch" aria-checked={!!checked} onClick={() => onChange(!checked)} style={{
+      width: 52, height: 32, borderRadius: 999, border: 'none', cursor: 'pointer',
       background: checked ? 'var(--accent)' : 'var(--surface-3)',
-      position: 'relative', transition: 'background .2s ease', flexShrink: 0,
+      position: 'relative', transition: 'background .25s ease', flexShrink: 0,
     }}>
       <span style={{
         position: 'absolute', top: 3, insetInlineStart: checked ? 23 : 3,
-        width: 24, height: 24, borderRadius: '50%', background: checked ? '#000' : '#fff',
-        transition: 'inset-inline-start .2s ease',
-        boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+        width: 26, height: 26, borderRadius: '50%', background: '#fff',
+        transition: 'inset-inline-start .3s cubic-bezier(.34,1.56,.64,1)',
+        boxShadow: '0 1px 4px rgba(0,0,0,.25)',
       }} />
     </button>
   );
 }
 
 // List row (settings-style)
-function Row({ icon, label, sub, right, onClick, danger }) {
+// Settings-style row. A button only when tappable, so a Toggle on the right
+// isn't a button nested in a button.
+function Row({ icon, iconNode, tint, label, sub, right, onClick, danger }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <button onClick={onClick} className="row" style={{
+    <Tag onClick={onClick} className={onClick ? 'row' : undefined} style={{
       width: '100%', display: 'flex', alignItems: 'center', gap: 14,
-      padding: '14px 18px', background: 'transparent', border: 'none',
+      padding: '13px 16px', background: 'transparent', border: 'none',
       cursor: onClick ? 'pointer' : 'default', textAlign: 'start',
-      color: danger ? '#FF5C5C' : 'var(--ink)', fontFamily: 'inherit',
+      color: danger ? 'var(--danger)' : 'var(--ink)', fontFamily: 'inherit',
     }}>
-      {icon && (
+      {(icon || iconNode) && (
         <div style={{
-          width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2)',
+          width: 40, height: 40, borderRadius: '50%', background: tint || 'var(--surface-2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: danger ? '#FF5C5C' : 'var(--ink)', flexShrink: 0,
+          color: danger ? 'var(--danger)' : 'var(--ink)', flexShrink: 0,
         }}>
-          <Icon name={icon} size={18} />
+          {iconNode || <Icon name={icon} size={19} />}
         </div>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 500 }}>{label}</div>
-        {sub && <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2 }}>{sub}</div>}
+        <div style={{ fontSize: 15.5, fontWeight: 600 }}>{label}</div>
+        {sub && <div style={{ fontSize: 13, color: 'var(--ink-dim)', marginTop: 2 }}>{sub}</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-dim)' }}>
         {right}
       </div>
-    </button>
+    </Tag>
   );
 }
 
