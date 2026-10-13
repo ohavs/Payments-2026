@@ -84,6 +84,9 @@ const CATEGORY_ICONS = {
       <path d="M9.6 20.6v-5.4h4.8v5.4" fill="#F25C54" {...sw} />
     </>
   ),
+  bolt: (
+    <path d="M13.6 2.6 4.8 13.4h6.1l-1.5 8 8.8-10.8h-6.1Z" fill="#FFC93C" {...sw} />
+  ),
   heart: (
     <path d="M12 20.2s-7.6-4.6-7.6-10a4.3 4.3 0 0 1 7.6-2.8 4.3 4.3 0 0 1 7.6 2.8c0 5.4-7.6 10-7.6 10Z" fill="#F25C54" {...sw} />
   ),
@@ -111,7 +114,8 @@ const RULES = [
   [/ביטוח/, 'shield', 'var(--lavender)'],
   [/אוכל|מסעד|קפה|בחוץ|פיצה|ארוח|food/i, 'food', 'var(--peach)'],
   [/דלק|רכב|תחבור|חני|מונית|car|fuel/i, 'car', 'var(--sky)'],
-  [/בית|דיר|חשבונ|חשמל|מים|ארנונ|שכיר/, 'house', 'var(--butter)'],
+  [/חשבונ|חשמל|מים|גז|ארנונ|אינטרנט|bill/i, 'bolt', 'var(--lavender)'],
+  [/בית|דיר|שכיר/, 'house', 'var(--butter)'],
   [/בריא|רופא|תרופ|פארם|health/i, 'heart', 'var(--danger-soft)'],
   [/מתנ|gift/i, 'gift', 'var(--danger-soft)'],
   [/טיס|חופש|נסיע|טיול|travel/i, 'plane', 'var(--sky)'],
@@ -124,7 +128,7 @@ const FALLBACK = [
 ];
 
 // Chart/bar colour per icon, so a category looks the same everywhere.
-const ICON_COLOR = { cart: '#22A45D', shield: '#4F46E5', food: '#FF8A3D', car: '#3B82F6', house: '#F2B705', heart: '#F25C54', gift: '#EC4899', plane: '#0EA5E9', bag: '#A855F7', box: '#F2B705' };
+const ICON_COLOR = { cart: '#22A45D', shield: '#4F46E5', food: '#FF8A3D', car: '#3B82F6', house: '#F2B705', bolt: '#EAB308', heart: '#F25C54', gift: '#EC4899', plane: '#0EA5E9', bag: '#A855F7', box: '#F2B705' };
 
 export function categoryVisual(name = '') {
   for (const [re, icon, soft] of RULES) {

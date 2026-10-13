@@ -389,7 +389,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
         <Row icon="card" tint="var(--mint)" label="תקציב חודשי"
           sub={cap > 0 ? `${fmtMoney(cap, currency)} לחודש` : 'לא הוגדר'}
           onClick={() => setBudgetOpen(true)} right={chevron} />
-        <Row icon="user" tint="var(--lavender)" label="מעקבים ושיתוף"
+        <Row icon="user" tint="var(--lavender)" label="מרחבים ושיתוף"
           sub={`${lists.activeList?.name || 'ההוצאות שלי'}${members > 1 ? ` · ${members} משתתפים` : ''}`}
           onClick={() => setManageOpen(true)} right={chevron} />
         <Row icon="shekel" tint="var(--butter)" label="מטבע"

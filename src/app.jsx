@@ -3,12 +3,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { LoginScreen } from './auth.jsx';
 import { FeedbackProvider, FullScreenLoader, useConfirm, useToast } from './feedback.jsx';
 import { useAuthUser, useFirebaseSettings, usePayments } from './firebase-init.jsx';
-import { DEFAULT_CATEGORIES, useLists } from './lists.jsx';
+import { DEFAULT_CATEGORIES, isSharedList, useLists, useSpaceSubs } from './lists.jsx';
 import { notifPermission, registerFcmToken, scanForReminders } from './notifications.jsx';
 import { QuickAddSheet } from './quick-add.jsx';
 import { ExpensesScreen } from './screens/expenses.jsx';
 import { SubscriptionsScreen } from './screens/subscriptions.jsx';
 import { SettingsScreen } from './screens.jsx';
+import { SharedSpaceSheet } from './spaces.jsx';
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
 import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
@@ -47,6 +48,31 @@ function AppInner() {
   const lists = useLists(user?.uid, user);
   const categories = lists.activeList?.groups?.length ? lists.activeList.groups : DEFAULT_CATEGORIES;
 
+  // The active space drives the whole app. A shared space has its own
+  // subscriptions (lists/{id}/subs) and its own budget (list.budget); the
+  // personal space uses users/{uid}/payments and the user's settings.
+  const activeShared = isSharedList(lists.activeList);
+  const sharedIds = useMemo(() => lists.spaces.filter(isSharedList).map((l) => l.id), [lists.spaces]);
+  const spaceSubs = useSpaceSubs(sharedIds);
+  const subs = activeShared ? (spaceSubs.byList[lists.activeListId] || []) : payments;
+  const subsLoading = activeShared ? !spaceSubs.loaded[lists.activeListId] : paymentsLoading;
+  const subOps = activeShared ? spaceSubs.opsFor(lists.activeListId) : paymentOps;
+  const allSubs = useMemo(
+    () => [...payments, ...sharedIds.flatMap((id) => spaceSubs.byList[id] || [])],
+    [payments, sharedIds, spaceSubs.byList]
+  );
+  const spaceSettings = activeShared
+    ? { ...settings, monthlyCap: 0, monthlyIncome: 0, includeSubsInBudget: true, categoryCaps: {}, ...(lists.activeList.budget || {}) }
+    : settings;
+  const setSpaceSettings = activeShared
+    ? (next) => lists.ops.setBudget(lists.activeListId, {
+        monthlyCap: Number(next.monthlyCap) || 0,
+        monthlyIncome: Number(next.monthlyIncome) || 0,
+        includeSubsInBudget: next.includeSubsInBudget !== false,
+        categoryCaps: next.categoryCaps || {},
+      })
+    : setSettings;
+
   const [tab, setTab] = useState('expenses');
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickCategory, setQuickCategory] = useState(null);
@@ -55,6 +81,7 @@ function AppInner() {
   const [editCustom, setEditCustom] = useState(null);
   const [update, setUpdate] = useState(null);       // latest release info, when newer
   const [updateOpen, setUpdateOpen] = useState(false);
+  const [sharedOpen, setSharedOpen] = useState(false);
 
   useTheme(user ? settings.theme : 'system');
 
@@ -75,8 +102,8 @@ function AppInner() {
   // On payments/settings change, scan for upcoming reminders
   useEffect(() => {
     if (!user || paymentsLoading || settingsLoading) return;
-    scanForReminders(payments, settings);
-  }, [user?.uid, payments.length, settings?.notif, settingsLoading, paymentsLoading]);
+    scanForReminders(allSubs, settings);
+  }, [user?.uid, allSubs.length, settings?.notif, settingsLoading, paymentsLoading]);
 
   // Re-register FCM token on app load if notification permission is already granted
   // (handles new device, token expiry, etc.)
@@ -97,15 +124,15 @@ function AppInner() {
 
   // Handlers — write through to Firestore + toast feedback
   const savePayment = async (p) => {
-    try { await paymentOps.update(p); toast('השינויים נשמרו', { type: 'success' }); }
+    try { await subOps.update(p); toast('השינויים נשמרו', { type: 'success' }); }
     catch (e) { toast('שגיאה בשמירה', { type: 'error' }); }
   };
   const deletePayment = async (id) => {
-    try { await paymentOps.remove(id); setDetail(null); toast('התשלום נמחק', { type: 'success' }); }
+    try { await subOps.remove(id); setDetail(null); toast('התשלום נמחק', { type: 'success' }); }
     catch (e) { toast('שגיאה במחיקה', { type: 'error' }); }
   };
   const addPayment = async (p) => {
-    try { await paymentOps.add(p); toast('המנוי נוסף', { type: 'success' }); }
+    try { await subOps.add(p); toast(activeShared ? `המנוי נוסף ל${lists.activeList?.name || 'מרחב המשותף'}` : 'המנוי נוסף', { type: 'success' }); }
     catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
   const addExpense = async (item) => {
@@ -148,16 +175,19 @@ function AppInner() {
             <ExpensesScreen
               lists={lists}
               categories={categories}
-              payments={payments}
-              settings={settings}
-              setSettings={setSettings}
+              payments={subs}
+              settings={spaceSettings}
+              setSettings={setSpaceSettings}
               onQuickAdd={openQuickAdd}
+              onCreateShared={() => setSharedOpen(true)}
             />
           )}
           {tab === 'subs' && (
             <SubscriptionsScreen
-              payments={payments}
-              loading={paymentsLoading}
+              payments={subs}
+              loading={subsLoading}
+              lists={lists}
+              onCreateShared={() => setSharedOpen(true)}
               settings={settings}
               onOpenPayment={(p) => setDetail(p)}
               onOpenAdd={() => setAddSubOpen(true)}
@@ -197,6 +227,7 @@ function AppInner() {
           defaultCategory={quickCategory}
           recentTitles={recentTitles}
           canSave={!!lists.activeListId}
+          list={activeShared ? lists.activeList : null}
           onAdd={addExpense}
           onAddSubscription={() => { setQuickOpen(false); setTimeout(() => setAddSubOpen(true), 260); }}
         />
@@ -220,6 +251,7 @@ function AppInner() {
           onSave={(p) => { savePayment(p); setEditCustom(null); }}
         />
         <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
+        <SharedSpaceSheet open={sharedOpen} onClose={() => setSharedOpen(false)} lists={lists} />
       </div>
     </div>
   );

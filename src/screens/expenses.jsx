@@ -8,6 +8,8 @@ import {
   DAY_NAMES_HE, EditExpenseSheet, MONTH_NAMES_HE, ManageExpensesSheet, PendingInvitesCard,
   expenseDate, fmtDateHe, localISO, todayISO,
 } from '../lists.jsx';
+import { PayerDot, PayerPicker, PayerTotals, SpaceSwitcher } from '../spaces.jsx';
+import { isSharedList } from '../lists.jsx';
 import { CategoryBadge, CoinLogo } from '../ui/icons.jsx';
 import { Card, EmptyState, Money, MonthSwitcher, Pill, ProgressBar } from '../ui/kit.jsx';
 import { haptic } from '../lib/platform.js';
@@ -21,11 +23,20 @@ function dayLabel(iso) {
   return `יום ${DAY_NAMES_HE[d.getDay()]}׳ · ${fmtDateHe(d)}`;
 }
 
-function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd }) {
+// Category and note under the title; the category is skipped when it is
+// already the title (an expense saved without a name).
+function subtitle(it) {
+  return [it.title && it.title !== it.group ? it.group : null, it.note].filter(Boolean).join(' · ');
+}
+
+function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd, onCreateShared }) {
   const toast = useToast();
   const now = new Date();
   const [view, setView] = React.useState({ y: now.getFullYear(), m: now.getMonth() });
   const [filter, setFilter] = React.useState(null);
+  const [payer, setPayer] = React.useState(null);
+  const shared = isSharedList(lists.activeList);
+  React.useEffect(() => { setFilter(null); setPayer(null); }, [lists.activeListId]);
   const [editItem, setEditItem] = React.useState(null);
   const [summaryOpen, setSummaryOpen] = React.useState(false);
   const [budgetOpen, setBudgetOpen] = React.useState(false);
@@ -55,9 +66,10 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
   const monthName = MONTH_NAMES_HE[view.m];
   const monthLabel = `${monthName} ${view.y}`;
 
-  const visible = filter
+  const byCategory = filter
     ? stats.monthItems.filter((it) => (filter === 'ללא קטגוריה' ? !it.group || !categories.includes(it.group) : it.group === filter))
     : stats.monthItems;
+  const visible = shared && payer ? byCategory.filter((it) => (it.paidBy || it.addedBy) === payer) : byCategory;
   const days = React.useMemo(() => {
     const map = new Map();
     visible.forEach((it) => {
@@ -68,7 +80,6 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [visible]);
 
-  const shared = (lists.activeList?.members || []).length > 1;
   const capColor = stats.overCap ? 'var(--danger)' : stats.pctUsed > 85 ? 'var(--warn)' : 'var(--accent)';
 
   return (
@@ -77,16 +88,8 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1 }}>הוצאות</h1>
-          {(lists.lists.length > 1 || shared) && (
-            <button onClick={() => setManageOpen(true)} style={{
-              border: 'none', background: 'transparent', padding: '4px 0 0', cursor: 'pointer', fontFamily: 'inherit',
-              color: 'var(--ink-dim)', fontSize: 13.5, fontWeight: 700,
-            }}>
-              {lists.activeList?.name || ''}{shared ? ' · משותף' : ''} ▾
-            </button>
-          )}
         </div>
-        <button onClick={() => setManageOpen(true)} aria-label="מעקבים ושיתוף" className="press" style={{
+        <button onClick={() => setManageOpen(true)} aria-label="מרחבים ושיתוף" className="press" style={{
           width: 42, height: 42, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', color: 'var(--ink)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -100,6 +103,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
         </button>
       </div>
 
+      <SpaceSwitcher lists={lists} onCreateShared={onCreateShared} />
       <PendingInvitesCard lists={lists} />
 
       {/* Month total */}
@@ -141,6 +145,12 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
         )}
       </Card>
 
+      {/* Who paid what (shared space) */}
+      {shared && stats.count > 0 && (
+        <PayerTotals list={lists.activeList} items={stats.monthItems} currency={currency}
+          value={payer} onChange={setPayer} style={{ marginTop: 14 }} />
+      )}
+
       {/* Category filter */}
       {stats.catRows.length > 0 && (
         <div className="hide-scroll" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '16px -18px 0', padding: '2px 18px' }}>
@@ -175,7 +185,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
           </EmptyState>
         </Card>
       ) : (
-        <div key={`${view.y}-${view.m}-${filter || ''}`}>
+        <div key={`${view.y}-${view.m}-${filter || ''}-${payer || ''}`}>
           {days.map(([iso, items], di) => {
             const sum = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
             return (
@@ -196,13 +206,16 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
                         <div style={{ fontSize: 15.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {it.title || it.group || 'הוצאה'}
                         </div>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {[it.group, it.note].filter(Boolean).join(' · ') || 'ללא קטגוריה'}
-                        </div>
+                        {subtitle(it) && (
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {subtitle(it)}
+                          </div>
+                        )}
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                         {fmtMoney(it.amount, currency)}
                       </div>
+                      {shared && <PayerDot list={lists.activeList} payer={it.paidBy || it.addedBy} />}
                     </button>
                   ))}
                 </Card>
@@ -214,6 +227,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
 
       <EditExpenseSheet open={!!editItem} onClose={() => setEditItem(null)}
         item={editItem} categories={categories}
+        renderPayer={shared ? (value, set) => <PayerPicker list={lists.activeList} value={value} onChange={set} /> : null}
         onSave={(item) => { lists.ops.updateItem(lists.activeListId, item); setEditItem(null); toast('נשמר', { type: 'success' }); }}
         onDelete={(id) => { haptic('warning'); lists.ops.removeItem(lists.activeListId, id); setEditItem(null); toast('נמחק', { type: 'info' }); }} />
       <BudgetDetailSheet open={summaryOpen} onClose={() => setSummaryOpen(false)}

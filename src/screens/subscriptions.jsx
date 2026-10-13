@@ -9,6 +9,7 @@ import {
 import { useExchangeRates } from '../fx.jsx';
 import { useStickyState } from '../lists.jsx';
 import { CalendarScreen, StatsDetailSheet } from '../screens.jsx';
+import { SpaceSwitcher } from '../spaces.jsx';
 import { CoinLogo } from '../ui/icons.jsx';
 import { Card, EmptyState, Money, Pill, Segmented } from '../ui/kit.jsx';
 import { haptic } from '../lib/platform.js';
@@ -18,7 +19,7 @@ function daysFromToday(iso) {
   return Math.round((parseISODate(iso) - t) / 86400000);
 }
 
-function SubscriptionsScreen({ payments, loading, settings, onOpenPayment, onOpenAdd }) {
+function SubscriptionsScreen({ payments, loading, lists, onCreateShared, settings, onOpenPayment, onOpenAdd }) {
   const fx = useExchangeRates();
   const currency = settings.defaultCurrency || '₪';
   const [calendar, setCalendar] = useStickyState('subs.calendar', false);
@@ -57,6 +58,7 @@ function SubscriptionsScreen({ payments, loading, settings, onOpenPayment, onOpe
           fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
         }}>+ מנוי</button>
       </div>
+      <SpaceSwitcher lists={lists} onCreateShared={onCreateShared} />
 
       {!loading && payments.length === 0 ? (
         <Card style={{ marginTop: 16 }}>
@@ -71,7 +73,7 @@ function SubscriptionsScreen({ payments, loading, settings, onOpenPayment, onOpe
             <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink-dim)' }}>סה״כ בחודש</div>
             <Money value={monthly} size={48} currency={currency} style={{ marginTop: 6 }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-              <Pill tone="lavender">{payments.length} מנויים</Pill>
+              <Pill tone="lavender">{payments.length === 1 ? 'מנוי אחד' : `${payments.length} מנויים`}</Pill>
               <Pill>{fmtMoney(monthly * 12, currency)} בשנה</Pill>
               <Pill onClick={() => setStatsOpen(true)}>
                 פירוט

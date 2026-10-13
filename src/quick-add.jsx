@@ -5,6 +5,8 @@ import { Sheet } from './components.jsx';
 import { fmtMoney } from './data.jsx';
 import { useToast } from './feedback.jsx';
 import { MiniCalendar, localISO, todayISO } from './lists.jsx';
+import { PayerPicker } from './spaces.jsx';
+import { fbAuth } from './firebase-init.jsx';
 import { CategoryBadge } from './ui/icons.jsx';
 import { Keypad, Segmented, applyKey, formatTyped } from './ui/kit.jsx';
 import { haptic } from './lib/platform.js';
@@ -19,7 +21,7 @@ function shortDate(iso) {
   return `${d}.${m}${y !== new Date().getFullYear() ? `.${String(y).slice(2)}` : ''}`;
 }
 
-function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitles = [], canSave, onAdd, onAddSubscription }) {
+function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitles = [], canSave, list, onAdd, onAddSubscription }) {
   const toast = useToast();
   const [amount, setAmount] = React.useState('');
   const [bump, setBump] = React.useState(0);
@@ -27,10 +29,12 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitle
   const [title, setTitle] = React.useState('');
   const [date, setDate] = React.useState(todayISO());
   const [calendarOpen, setCalendarOpen] = React.useState(false);
+  const [paidBy, setPaidBy] = React.useState(null);
 
   React.useEffect(() => {
     if (!open) return;
     setAmount(''); setBump(0); setTitle(''); setDate(todayISO()); setCalendarOpen(false);
+    setPaidBy(fbAuth.currentUser?.uid || null);
     setCategory(defaultCategory && categories.includes(defaultCategory) ? defaultCategory : categories[0]);
   }, [open]);
 
@@ -41,6 +45,7 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitle
   const save = () => {
     if (!ready) return;
     const item = { title: title.trim() || category, amount: value, group: category, note: '', date };
+    if (list && paidBy) item.paidBy = paidBy;
     onAdd(item);
     toast(`נוספה הוצאה · ${fmtMoney(value)} · ${category}`, { type: 'success' });
     onClose();
@@ -139,6 +144,7 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitle
             ))}
           </div>
         )}
+        {list && <PayerPicker list={list} value={paidBy} onChange={setPaidBy} />}
         {calendarOpen && (
           <MiniCalendar value={date} onPick={(iso) => { setDate(iso); setCalendarOpen(false); }} />
         )}

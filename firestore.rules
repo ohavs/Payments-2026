@@ -49,8 +49,12 @@ service cloud.firestore {
 
       allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
 
-      // Expenses belong to the tracker; members only.
+      // Expenses and shared subscriptions belong to the space; members only.
       match /items/{itemId} {
+        allow read, write: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/lists/$(listId)).data.members;
+      }
+      match /subs/{subId} {
         allow read, write: if signedIn()
           && request.auth.uid in get(/databases/$(database)/documents/lists/$(listId)).data.members;
       }
