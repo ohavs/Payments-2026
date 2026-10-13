@@ -173,6 +173,9 @@ function useLists(uid, user) {
         amount: cleanAmount(item.amount),
         note: (item.note || '').trim(),
         date: item.date || todayISO(),
+        // Where the expense came from: 'manual' now; later 'wallet', 'card'
+        // or 'gmail' once expenses can be detected automatically.
+        source: item.source || 'manual',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       }),
       updateItem: (id, item) => {

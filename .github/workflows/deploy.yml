@@ -18,7 +18,15 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
+
+      - name: Install, test and build
+        run: |
+          npm ci
+          npm run lint
+          npm test
+          npm run build
 
       - name: Write service account key
         run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
@@ -31,6 +39,13 @@ jobs:
         run: npx --yes firebase-tools@latest deploy --only hosting --project schedual-fdde7 --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+
+      # Open the live site in a real browser and make sure it boots.
+      - name: Smoke-test the live site
+        run: |
+          npm i --no-save playwright@1.64.0
+          npx playwright install --with-deps chromium
+          node scripts/smoke-live.mjs https://schedual-fdde7.web.app/
 
       # Rules deploy separately. If this step fails (e.g. IAM still propagating),
       # the app is already live; just re-run the job once rules can deploy.

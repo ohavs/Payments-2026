@@ -1,54 +1,44 @@
 # Payments-2026
 
-Hebrew RTL recurring-payments tracker. Static HTML + React (Babel-in-browser) + Firebase (Hosting, Auth, Firestore).
+Hebrew RTL expenses + recurring-payments tracker. React + Vite, Firebase (Auth, Firestore, Hosting, Cloud Functions, FCM). Heading to an Android app (Capacitor); see `docs/PLAN.md` and `PROGRESS.md`.
 
-## Schema
+## Develop
 
+```bash
+npm install
+npm run dev        # http://localhost:5173 against production Firebase
+npm test           # unit tests (Vitest)
+npm run lint
+npm run build      # → dist/
 ```
-users/{uid}/
-  settings/main                — single settings document
-  payments/{paymentId}         — one document per tracked payment
-```
 
-Each browser is signed in **anonymously** on first load; data is scoped to that uid by `firestore.rules`.
+Against local emulators instead of production:
+
+```bash
+npx firebase-tools emulators:start --only auth,firestore --project demo-payments
+VITE_USE_EMULATORS=1 npm run dev
+```
 
 ## Deploy
 
-```bash
-npm i -g firebase-tools
-firebase login
-firebase use schedual-fdde7
+Pushing to `claude/implement-payments-page-G9fij` runs `.github/workflows/deploy.yml`: lint, tests, build, deploy Hosting (`dist/`), smoke-test the live site, deploy Firestore rules. Live: https://schedual-fdde7.web.app
 
-# First time: in the Firebase Console, enable
-#   - Authentication → Sign-in method → Anonymous
-#   - Firestore Database → Create database (production mode is fine; rules deploy next)
-#   - Hosting → Get started (no need to upload anything)
+## Data
 
-firebase deploy
+```
+users/{uid}/settings/main          settings
+users/{uid}/payments/{id}          recurring payment; nextDate is the recurrence anchor (src/lib/recurrence.js)
+lists/{id}                         shared expenses tracker (members, invitedEmails)
+lists/{id}/items/{id}              expense
 ```
 
-After deploy: `https://schedual-fdde7.web.app`
+## Layout
 
-## Wipe existing project content
-
-```bash
-# remove existing Hosting site contents
-firebase deploy --only hosting
-
-# remove existing Firestore collections — requires running the destructive
-# script manually, or doing it from the Firebase Console (Firestore → … → Delete collection).
-```
-
-## Files
-
-- `payments.html` — entry HTML (RTL Hebrew, Heebo font, CSS variables for theming)
-- `index.html` — redirects to `payments.html` (Hosting rewrites all to `payments.html` anyway)
-- `app.jsx` — root component, theme/accent, navigation, sheet mounts
-- `firebase-init.jsx` — Firebase init + `usePayments` / `useFirebaseSettings` hooks
-- `data.jsx` — service catalog, helpers (`fmtMoney`, `isAutoPaid`, etc.)
-- `components.jsx` — `Sheet`, `Icon`, `Chip`, `Toggle`, `Row`, `ServiceBubble`
-- `payment-card.jsx` — `StatsCard`, `ListCard`, `SectionHeader`
-- `stacked-list.jsx` — single-container glassmorphism stacked payments list
-- `sheets.jsx` — `DetailSheet`, `AddSheet`, `CustomServiceBuilder`, `EditCustomSheet`
-- `screens.jsx` — `HomeScreen`, `CalendarScreen`, `SettingsScreen`
-- `tweaks-panel.jsx` — design-tool tweaks panel (no-op outside Claude Design)
+- `index.html`, `src/main.jsx`: entry
+- `src/app.jsx`: shell, navigation, sheets
+- `src/screens.jsx`, `src/sheets.jsx`, `src/lists.jsx`, `src/budget.jsx`: screens and flows
+- `src/data.jsx`: service catalog, money/date helpers
+- `src/lib/firebase.js`: Firebase config (and emulator wiring)
+- `src/lib/recurrence.js`: next/last occurrence of a recurring payment (copied to `functions/recurrence.mjs`)
+- `functions/`: scheduled FCM reminders
+- `public/sw.js`: offline shell + background push
