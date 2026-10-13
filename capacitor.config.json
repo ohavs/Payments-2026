@@ -1,0 +1,11 @@
+{
+  "appId": "com.ohavs.payments",
+  "appName": "תשלומים",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

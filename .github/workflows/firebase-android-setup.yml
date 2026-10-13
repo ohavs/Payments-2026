@@ -1,0 +1,46 @@
+name: Firebase Android app setup
+
+# One-off and idempotent: registers the Android app in Firebase, adds the
+# release key's fingerprints (needed for Google sign-in) and prints
+# google-services.json, which is committed to android/app/.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/firebase-android-setup.yml
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: schedual-fdde7
+      PACKAGE: com.ohavs.payments
+      SHA1: F748 90AD F80A DDBC 50E4 2558 8A90 7419 9183 AEBA
+      SHA256: DC8B 1CEF D148 26BD 994D 343B 338D 1C79 500E 7D3A D416 656F F5E4 229A 7472 5C0B
+    steps:
+      - name: Write service account key
+        run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Register app, fingerprints, print config
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          set -euo pipefail
+          fb() { npx --yes firebase-tools@15.33.0 "$@" --project "$PROJECT" --non-interactive; }
+          APP_ID=$(fb apps:list ANDROID --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s).result||[];const a=r.find(x=>x.packageName===process.env.PACKAGE);console.log(a?a.appId:"")})')
+          if [ -z "$APP_ID" ]; then
+            APP_ID=$(fb apps:create ANDROID "Payments Android" --package-name "$PACKAGE" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).result.appId))')
+            echo "created $APP_ID"
+          fi
+          echo "APP_ID=$APP_ID"
+          EXISTING=$(fb apps:android:sha:list "$APP_ID" --json || echo '{}')
+          for SHA in "$SHA1" "$SHA256"; do
+            HEX=$(echo "$SHA" | tr -d ' :' | tr 'A-F' 'a-f')
+            if echo "$EXISTING" | grep -qi "$HEX"; then echo "sha present: $HEX"; else fb apps:android:sha:create "$APP_ID" "$HEX"; fi
+          done
+          fb apps:sdkconfig ANDROID "$APP_ID" --out "$RUNNER_TEMP/google-services.json"
+          echo "----- google-services.json (base64) -----"
+          base64 -w0 "$RUNNER_TEMP/google-services.json"; echo
+          echo "----- end -----"
