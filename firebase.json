@@ -8,6 +8,8 @@
       "**/node_modules/**",
       "functions/**",
       "README.md",
+      "CLAUDE.md",
+      "PROGRESS.md",
       "docs/**",
       "firestore.rules",
       "firestore.indexes.json"
