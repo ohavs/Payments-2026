@@ -14,7 +14,7 @@ import { SummaryScreen } from './screens/summary.jsx';
 import { SettingsScreen } from './screens.jsx';
 import { SharedSpaceSheet } from './spaces.jsx';
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
-import { GmailScanSheet, SuggestionsCard, useDetectedSuggestions } from './suggestions.jsx';
+import { GmailScanSheet, SuggestionsCard, useDetectedSuggestions, useGmailInbox } from './suggestions.jsx';
 import { listSuggestions, onDetectEvent, suggestionToItem, takeLaunchAction } from './lib/detect.js';
 import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
@@ -81,6 +81,7 @@ function AppInner() {
       })
     : setSettings;
 
+  const gmailInbox = useGmailInbox({ enabled: !!user && !user.isAnonymous, items: lists.items, subs: allSubs });
   const [tab, setTab] = useState('expenses');
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickCategory, setQuickCategory] = useState(null);
@@ -187,11 +188,22 @@ function AppInner() {
     try {
       const added = [];
       for (const s of list) { const item = toItem(s); await lists.ops.addItem(lists.activeListId, item); added.push(item); }
-      await detected.remove(list.map((s) => s.id));
+      removeSuggestions(list.map((s) => s.id));
       haptic('success');
       toast(added.length === 1 ? `נוספה הוצאה · ${fmtMoney(added[0].amount)} · ${added[0].title}` : `נוספו ${added.length} הוצאות`, { type: 'success' });
     } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
+  // Wallet / card suggestions live on the phone; Gmail ones in the Gmail inbox.
+  const removeSuggestions = (ids) => {
+    const gmail = ids.filter((id) => String(id).startsWith('gmail:'));
+    const native = ids.filter((id) => !String(id).startsWith('gmail:'));
+    if (gmail.length) gmailInbox.remove(gmail);
+    if (native.length) detected.remove(native);
+  };
+  const allSuggestions = useMemo(
+    () => [...detected.suggestions, ...gmailInbox.suggestions].sort((a, b) => (b.time || 0) - (a.time || 0)),
+    [detected.suggestions, gmailInbox.suggestions]
+  );
   const editSuggestion = (s) => {
     haptic('tap'); setQuickCategory(null); setQuickPrefill({ ...toItem(s), suggestionId: s.id }); setQuickOpen(true);
   };
@@ -251,8 +263,8 @@ function AppInner() {
               onCreateShared={() => setSharedOpen(true)}
               onOpenSummary={() => { haptic('tap'); setTab('summary'); }}
               suggestionsCard={(
-                <SuggestionsCard suggestions={detected.suggestions} categories={categories} items={lists.items}
-                  onAdd={addSuggestions} onDismiss={(l) => detected.remove(l.map((s) => s.id))} onEdit={editSuggestion}
+                <SuggestionsCard suggestions={allSuggestions} categories={categories} items={lists.items}
+                  onAdd={addSuggestions} onDismiss={(l) => removeSuggestions(l.map((s) => s.id))} onEdit={editSuggestion}
                   style={{ marginTop: 14 }} />
               )}
             />
@@ -315,7 +327,7 @@ function AppInner() {
           recentTitles={recentTitles}
           canSave={!!lists.activeListId}
           list={activeShared ? lists.activeList : null}
-          onAdd={(item) => { addExpense(item); if (quickPrefill?.suggestionId) detected.remove([quickPrefill.suggestionId]); }}
+          onAdd={(item) => { addExpense(item); if (quickPrefill?.suggestionId) removeSuggestions([quickPrefill.suggestionId]); }}
           onAddSubscription={() => { setQuickOpen(false); setTimeout(() => setAddSubOpen(true), 260); }}
         />
         <DetailSheet
@@ -343,7 +355,7 @@ function AppInner() {
           categories={categories} items={lists.items} subs={allSubs}
           currency={spaceSettings.defaultCurrency || '₪'} rates={fx?.rates}
           onAddExpense={(item) => lists.ops.addItem(lists.activeListId, item).then(() => toast(`נוספה הוצאה · ${fmtMoney(item.amount)} · ${item.title}`, { type: 'success' })).catch(() => toast('שגיאה בהוספה', { type: 'error' }))}
-          onAddSubscription={addPayment} />
+          onAddSubscription={addPayment} onScanned={gmailInbox.enableAuto} />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 // Receipts from Gmail: read-only access, on demand ("סרוק"), from the Google
 // account the user is signed in with. Messages are read in the app, turned
 // into suggestions, and nothing from the mailbox is stored.
+import { registerPlugin } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import firebase from './firebase.js';
 import { isNative } from './platform.js';
@@ -30,6 +31,18 @@ export function receiptQuery(days = 90) {
 
 // ---------- Access ----------
 let cached = null; // { token, until }
+const GmailToken = registerPlugin('GmailToken');
+
+// Android, once access was granted: a token with no UI at all (null when
+// the grant is missing or Google wants it confirmed again).
+export async function silentGmailToken() {
+  if (!isNative) return null;
+  try {
+    const { token } = await GmailToken.silentToken();
+    if (token) cached = { token, until: Date.now() + 45 * 60 * 1000 };
+    return token || null;
+  } catch (e) { return null; }
+}
 
 export async function getGmailToken() {
   if (cached && cached.until > Date.now()) return cached.token;
@@ -37,6 +50,8 @@ export async function getGmailToken() {
   if (import.meta.env.VITE_USE_EMULATORS) {
     // Local/e2e runs: emulator accounts have no Google token; tests mock the API.
     token = 'emulator-token';
+  } else if (isNative && (token = await silentGmailToken())) {
+    // Already granted: no account picker.
   } else if (isNative) {
     // The legacy Google Sign-In flow returns an access token every time
     // (the Credential Manager flow omits it once access was granted before).

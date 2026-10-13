@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ApkUpdaterPlugin.class);
         registerPlugin(PaymentDetectPlugin.class);
+        registerPlugin(GmailTokenPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

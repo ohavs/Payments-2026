@@ -6,7 +6,7 @@ import { Icon, ServiceBubble, Sheet } from './components.jsx';
 import { fmtMoney, getService } from './data.jsx';
 import { Spinner } from './feedback.jsx';
 import { detectSupported, isAlreadyRecorded, listSuggestions, onDetectEvent, removeSuggestions, suggestionToItem } from './lib/detect.js';
-import { scanGmail } from './lib/gmail.js';
+import { scanGmail, silentGmailToken } from './lib/gmail.js';
 import { haptic, isNative } from './lib/platform.js';
 import { CategoryBadge } from './ui/icons.jsx';
 import { Card } from './ui/kit.jsx';
@@ -117,6 +117,70 @@ function saveHandled(set) {
   try { localStorage.setItem(HANDLED_KEY, JSON.stringify([...set].slice(-500))); } catch (e) { /* private mode */ }
 }
 
+// Receipts that belong to a subscription the user already tracks.
+function trackedBy(subs) {
+  const names = new Set(subs.map((p) => (p.customService?.name || getService(p.serviceId)?.name || '').toLowerCase()));
+  const ids = new Set(subs.map((p) => p.serviceId).filter(Boolean));
+  return (r) => (r.serviceId && ids.has(r.serviceId)) || names.has((r.merchant || '').toLowerCase());
+}
+
+// ---------- Automatic Gmail scan (Android) ----------
+// After the first manual scan, the app checks Gmail by itself whenever it
+// opens (at most every few hours) with a silent token, and new receipts join
+// the "זוהו תשלומים" card next to the Wallet ones.
+const AUTO_KEY = 'gmail-auto';
+const INBOX_KEY = 'gmail-inbox-v1';
+const LAST_KEY = 'gmail-last-scan';
+const AUTO_EVERY_MS = 4 * 3600 * 1000;
+const store = {
+  get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } },
+};
+
+function useGmailInbox({ enabled, items, subs }) {
+  const [inbox, setInbox] = React.useState(() => store.get(INBOX_KEY, []));
+  const ctx = React.useRef({ items, subs });
+  ctx.current = { items, subs };
+
+  const run = React.useCallback(async (force = false) => {
+    if (!isNative || !store.get(AUTO_KEY, false)) return;
+    if (!force && Date.now() - store.get(LAST_KEY, 0) < AUTO_EVERY_MS) return;
+    const token = await silentGmailToken();
+    if (!token) return;
+    try {
+      const { receipts } = await scanGmail({ days: 30, max: 40, token });
+      store.set(LAST_KEY, Date.now());
+      const handled = loadHandled();
+      setInbox((prev) => {
+        const known = new Set(prev.map((r) => r.id));
+        const fresh = receipts.filter((r) => !known.has(r.id) && !handled.has(r.id));
+        const next = [...fresh, ...prev].slice(0, 40);
+        store.set(INBOX_KEY, next);
+        return next;
+      });
+    } catch (e) { console.error('auto gmail scan failed', e); }
+  }, []);
+
+  React.useEffect(() => {
+    if (!enabled || !isNative) return undefined;
+    run();
+    const h = CapApp.addListener('resume', () => run());
+    return () => { h.then((x) => x.remove()); };
+  }, [enabled, run]);
+
+  const remove = React.useCallback((ids) => {
+    const handled = loadHandled();
+    ids.forEach((id) => handled.add(id));
+    saveHandled(handled);
+    setInbox((prev) => { const next = prev.filter((r) => !ids.includes(r.id)); store.set(INBOX_KEY, next); return next; });
+  }, []);
+
+  // Hide what got recorded or tracked meanwhile (also on another device).
+  const isTracked = trackedBy(subs);
+  const suggestions = inbox.filter((r) => !isTracked(r) && !isAlreadyRecorded(r, items));
+  return { suggestions, remove, enableAuto: () => store.set(AUTO_KEY, true) };
+}
+
 const CYCLE_HE = { monthly: 'לחודש', yearly: 'לשנה' };
 
 function gmailError(e) {
@@ -129,7 +193,7 @@ function gmailError(e) {
   return 'הסריקה נכשלה. נסה שוב.';
 }
 
-function GmailScanSheet({ open, onClose, categories, items, subs, currency, rates, onAddExpense, onAddSubscription }) {
+function GmailScanSheet({ open, onClose, categories, items, subs, currency, rates, onAddExpense, onAddSubscription, onScanned }) {
   const [state, setState] = React.useState('idle'); // idle | scanning | done | error
   const [error, setError] = React.useState('');
   const [result, setResult] = React.useState({ receipts: [], recurring: [] });
@@ -147,6 +211,7 @@ function GmailScanSheet({ open, onClose, categories, items, subs, currency, rate
       const r = await scanGmail();
       setResult(r);
       setState('done');
+      onScanned?.();
     } catch (e) {
       console.error('gmail scan failed', e);
       setError(gmailError(e));
@@ -156,9 +221,7 @@ function GmailScanSheet({ open, onClose, categories, items, subs, currency, rate
 
   // Hide what is already tracked: subscriptions the user has, receipts that
   // match an expense or belong to a subscription.
-  const subNames = new Set(subs.map((p) => (p.customService?.name || getService(p.serviceId)?.name || '').toLowerCase()));
-  const subIds = new Set(subs.map((p) => p.serviceId).filter(Boolean));
-  const isTracked = (r) => (r.serviceId && subIds.has(r.serviceId)) || subNames.has((r.merchant || '').toLowerCase());
+  const isTracked = trackedBy(subs);
   const recurring = result.recurring.filter((s) => !handled.has(s.key) && !isTracked(s));
   const recurringIds = new Set(result.recurring.flatMap((s) => s.receiptIds));
   const receipts = result.receipts.filter((r) => !handled.has(r.id) && !recurringIds.has(r.id) && !isTracked(r) && !isAlreadyRecorded(r, items));
@@ -190,6 +253,7 @@ function GmailScanSheet({ open, onClose, categories, items, subs, currency, rate
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink-dim)', lineHeight: 1.55 }}>
               מחפש קבלות וחיובים מ־90 הימים האחרונים ומציע להוסיף אותם כהוצאות או כמנויים.
               הקריאה היא לקריאה בלבד ונעשית בטלפון. שום מייל לא נשמר.
+              {isNative && ' אחרי הסריקה הראשונה, קבלות חדשות יופיעו לבד במסך ההוצאות.'}
             </div>
             {state === 'error' && (
               <div role="alert" style={{ marginTop: 14, color: 'var(--danger)', fontWeight: 700, fontSize: 14 }}>{error}</div>
@@ -267,4 +331,4 @@ function GmailScanSheet({ open, onClose, categories, items, subs, currency, rate
   );
 }
 
-export { GmailScanSheet, SuggestionsCard, useDetectedSuggestions };
+export { GmailScanSheet, SuggestionsCard, useDetectedSuggestions, useGmailInbox };

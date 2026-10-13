@@ -65,6 +65,9 @@
 
 - [x] פקדים מותאמים במקום ברירות המחדל של הדפדפן: בורר שעות (`src/ui/time-picker.jsx`, שעות משמאל, דקות מימין, קפיצות של 5 דק׳), פלטת צבעים מורחבת במקום `input type=color`, שדות מספר כטקסט עם מקלדת עשרונית, צבעי caret/selection. תאריכים כבר היו מותאמים (`MiniCalendar`)
 
+- [x] Gmail אוטומטי (אנדרואיד): `GmailTokenPlugin.silentToken` (GoogleAuthUtil, בלי UI). אחרי סריקה ידנית ראשונה, סריקה שקטה של 30 יום בכל פתיחה/חזרה (פעם ב־4 שעות), והקבלות נכנסות לכרטיס ההצעות יחד עם Wallet (`useGmailInbox`, localStorage)
+- [ ] Gmail במצב Testing: ההסכמה פגה כל 7 ימים. פתרון: Publish (דורש Branding). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
+
 ## החלטות
 - הפצה: APK ב־GitHub Releases + עדכון מתוך האפליקציה. בלי Play.
 - כניסה: חשבון Google.
