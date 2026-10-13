@@ -37,6 +37,7 @@ jobs:
           set +e
           gcloud functions list --project "$PROJECT" --format='table(name,state,environment)' 2>&1 | head -20
           gcloud run services list --project "$PROJECT" --format='value(metadata.name)' 2>&1 | head -20
+          gcloud firestore databases list --project "$PROJECT" --format='value(name,locationId)' 2>&1 | sed 's/^/firestore: /'
 
       - name: Report (billing, roles)
         run: |
