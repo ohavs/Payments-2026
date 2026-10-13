@@ -2,7 +2,8 @@
 import React, { useMemo, useState } from 'react';
 import { BudgetDetailSheet, BudgetHeroCard, BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from './budget.jsx';
 import { Chip, Icon, IconButton, Row, Sheet, Toggle } from './components.jsx';
-import { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, isAutoPaid, monthlyEquivalent, parseISODate, resolveService, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
+import { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, isAutoPaid, monthlyEquivalent, parseISODate, resolveService, statusDateISO, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
+import { occurrencesBetween } from './lib/recurrence.js';
 import { Spinner, useToast } from './feedback.jsx';
 import { useExchangeRates } from './fx.jsx';
 import { DEFAULT_CATEGORIES, ExpenseListSection, MONTH_NAMES_HE, PendingInvitesCard, useLists } from './lists.jsx';
@@ -335,7 +336,7 @@ function SubscriptionsScreen({ payments, paymentsLoading, onOpenPayment, onOpenA
     return [...payments].sort((a, b) => {
       const pa = isAutoPaid(a), pb = isAutoPaid(b);
       if (pa !== pb) return pa ? 1 : -1;
-      return parseISODate(a.nextDate) - parseISODate(b.nextDate);
+      return parseISODate(statusDateISO(a)) - parseISODate(statusDateISO(b));
     });
   }, [payments]);
 
@@ -563,13 +564,16 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 
   const paymentsByDay = useMemo(() => {
     const map = {};
+    // Every charge in the month: weekly payments show up on each week, and
+    // past-dated anchors keep recurring instead of vanishing.
+    const from = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const to = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     payments.forEach(p => {
-      const d = parseISODate(p.nextDate);
-      if (d.getMonth() === cursor.getMonth() && d.getFullYear() === cursor.getFullYear()) {
+      occurrencesBetween(p, from, to).forEach(d => {
         const day = d.getDate();
         if (!map[day]) map[day] = [];
         map[day].push(p);
-      }
+      });
     });
     return map;
   }, [payments, cursor]);

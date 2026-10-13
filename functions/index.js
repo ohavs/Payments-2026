@@ -6,7 +6,10 @@
 //
 // Schema read:
 //   users/{uid}/settings/main  → { notif, notifTimings[], notifTime, fcmToken }
-//   users/{uid}/payments/*     → { serviceId|customService, price, currency, nextDate }
+//   users/{uid}/payments/*     → { serviceId|customService, price, currency, cycle, nextDate }
+//
+// nextDate is the recurrence anchor and is never rolled forward in storage;
+// recurrence.mjs (an identical copy of src/lib/recurrence.js) projects it.
 //
 // Free-tier costs (single user, hourly cron): ~720 invocations/month — well
 // under the 2M free Cloud Functions tier.
@@ -71,9 +74,11 @@ exports.paymentReminders = onSchedule(
       hour: '2-digit', hour12: false, timeZone: 'Asia/Jerusalem',
     }).slice(0, 2);
 
-    // "Today" anchored to Jerusalem
-    const jerToday = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
-    jerToday.setHours(0, 0, 0, 0);
+    // "Today" as Jerusalem's calendar date, expressed as a local midnight so it
+    // compares directly with the recurrence helpers' local dates.
+    const [jy, jm, jd] = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }).split('-').map(Number);
+    const jerToday = new Date(jy, jm - 1, jd);
+    const { daysUntilNext } = await import('./recurrence.mjs');
 
     const usersSnap = await db.collection('users').listDocuments();
     logger.info(`Reminder tick — hour=${hourStr}, users=${usersSnap.length}`);
@@ -95,18 +100,17 @@ exports.paymentReminders = onSchedule(
         const reminders = [];
         paymentsSnap.forEach((pDoc) => {
           const p = pDoc.data();
-          if (!p.nextDate) return;
-          const due = new Date(p.nextDate); due.setHours(0, 0, 0, 0);
-          const diff = Math.round((due - jerToday) / 86400000);
+          const diff = daysUntilNext(p, jerToday);
+          if (diff === null) return;
           for (const timing of timings) {
             if (diff === TIMING_DAYS[timing]) {
-              reminders.push({ p, diff, timing });
+              reminders.push({ p, id: pDoc.id, diff, timing });
               break;
             }
           }
         });
 
-        for (const { p, diff } of reminders) {
+        for (const { p, id, diff } of reminders) {
           const title = `תזכורת תשלום: ${serviceName(p)}`;
           const body = `${whenLabel(diff)} · ${fmtMoney(p.price, p.currency)}`;
           try {
@@ -117,7 +121,7 @@ exports.paymentReminders = onSchedule(
                 fcmOptions: { link: '/payments.html' },
                 notification: { icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', dir: 'rtl', lang: 'he' },
               },
-              data: { paymentId: p.id || '', diff: String(diff) },
+              data: { paymentId: id, diff: String(diff) },
             });
             sent++;
           } catch (err) {

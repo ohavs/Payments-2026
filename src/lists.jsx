@@ -117,13 +117,26 @@ function useLists(uid, user) {
 
   React.useEffect(() => {
     if (!activeListId) { setItems([]); return; }
-    const unsub = fbDb.collection('lists').doc(activeListId).collection('items')
-      .onSnapshot((snap) => {
-        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rows.sort((a, b) => (expenseDate(b) - expenseDate(a)) || ((b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-        setItems(rows);
-      }, (err) => console.error('expense items subscribe error', err));
-    return () => unsub();
+    let unsub = () => {};
+    let retryTimer = null;
+    let attempt = 0;
+    const subscribe = () => {
+      unsub = fbDb.collection('lists').doc(activeListId).collection('items')
+        .onSnapshot((snap) => {
+          attempt = 0;
+          const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          rows.sort((a, b) => (expenseDate(b) - expenseDate(a)) || ((b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+          setItems(rows);
+        }, (err) => {
+          // A tracker created a moment ago (first sign-in) can still be in
+          // flight to the server, so the rules' membership lookup fails once
+          // and the listener dies. Re-subscribe a few times before giving up.
+          console.error('expense items subscribe error', err);
+          if (attempt < 5) { attempt += 1; retryTimer = setTimeout(subscribe, 700 * attempt); }
+        });
+    };
+    subscribe();
+    return () => { clearTimeout(retryTimer); unsub(); };
   }, [activeListId]);
 
   const activeList = React.useMemo(

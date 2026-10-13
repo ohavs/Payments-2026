@@ -2,7 +2,8 @@
 // Cloud Functions handle scheduled push (via FCM) when the app is closed;
 // the on-load scanner here covers in-session reminders too.
 import firebase, { FCM_VAPID_KEY } from './lib/firebase.js';
-import { fmtMoney, parseISODate, resolveService } from './data.jsx';
+import { fmtMoney, resolveService } from './data.jsx';
+import { daysUntilNext } from './lib/recurrence.js';
 import { fbDb } from './firebase-init.jsx';
 
 const NOTIF_TIMING_DAYS = { week: 7, three: 3, day: 1, same: 0 };
@@ -45,8 +46,7 @@ function scanForReminders(payments, settings) {
   const seen = JSON.parse(localStorage.getItem('notif-seen') || '{}');
 
   payments.forEach(p => {
-    const due = parseISODate(p.nextDate); due.setHours(0, 0, 0, 0);
-    const diff = Math.round((due - today) / 86400000);
+    const diff = daysUntilNext(p, today);
     timings.forEach(timing => {
       if (diff === NOTIF_TIMING_DAYS[timing]) {
         const key = `${p.id}:${stamp}:${timing}`;

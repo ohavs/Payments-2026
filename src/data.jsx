@@ -1,6 +1,7 @@
 // Catalog of popular Israeli services for the "add" picker.
 // Each entry: id, name (Hebrew), category, defaultPrice (NIS), defaultCycle, brand color, glyph
 import { convertCurrency } from './fx.jsx';
+import { isPaidThisCycle, lastOccurrenceBefore, nextOccurrence, occurrencesBetween, toISO } from './lib/recurrence.js';
 
 const SERVICE_CATALOG = [
   // Streaming
@@ -72,7 +73,8 @@ const CATEGORIES = [
 
 // Payments are loaded live from Firestore at /users/{uid}/payments — see firebase-init.jsx.
 // Each: id, serviceId | customService, price, currency, cycle, nextDate (ISO), note.
-// Paid state is derived automatically: a payment whose nextDate has passed is paid for this cycle.
+// nextDate is the recurrence anchor and never changes on its own; lib/recurrence
+// projects it forward. Paid state is derived: this month's charge already went through.
 function seedPayments() {
   return [];
 }
@@ -107,33 +109,40 @@ function getService(id) {
   return SERVICE_CATALOG.find(s => s.id === id);
 }
 
-// Auto-paid: nextDate has already passed → charge went through, no manual marking needed.
+// Auto-paid: this month's charge already went through, no manual marking needed.
 function isAutoPaid(payment) {
-  return daysUntil(payment.nextDate) < 0;
+  return isPaidThisCycle(payment);
 }
 
-// Sum of payments whose nextDate falls within current calendar month AND is on/before today.
+// Next charge on or after today, as YYYY-MM-DD.
+function nextDueISO(payment) {
+  const d = nextOccurrence(payment);
+  return d ? toISO(d) : payment.nextDate;
+}
+
+// The date a payment row shows: when it was charged if already paid this month,
+// otherwise when it is due next.
+function statusDateISO(payment) {
+  if (isAutoPaid(payment)) {
+    const last = lastOccurrenceBefore(payment);
+    if (last) return toISO(last);
+  }
+  return nextDueISO(payment);
+}
+
+// Sum of charges this calendar month on or before today.
 function paidThisMonth(payments) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const m = today.getMonth(), y = today.getFullYear();
-  return payments.reduce((sum, p) => {
-    const d = parseISODate(p.nextDate);
-    if (d.getFullYear() === y && d.getMonth() === m && d <= today) {
-      return sum + Number(p.price || 0);
-    }
-    return sum;
-  }, 0);
+  const from = new Date(today.getFullYear(), today.getMonth(), 1);
+  return payments.reduce((sum, p) => sum + occurrencesBetween(p, from, today).length * Number(p.price || 0), 0);
 }
 
-// Sum of payments planned this calendar month (paid + upcoming this month)
+// Sum of every charge planned this calendar month (paid + upcoming).
 function plannedThisMonth(payments) {
   const today = new Date();
-  const m = today.getMonth(), y = today.getFullYear();
-  return payments.reduce((sum, p) => {
-    const d = parseISODate(p.nextDate);
-    if (d.getFullYear() === y && d.getMonth() === m) return sum + Number(p.price || 0);
-    return sum;
-  }, 0);
+  const from = new Date(today.getFullYear(), today.getMonth(), 1);
+  const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  return payments.reduce((sum, p) => sum + occurrencesBetween(p, from, to).length * Number(p.price || 0), 0);
 }
 
 function fmtMoney(amount, cur = '₪') {
@@ -275,4 +284,4 @@ function countsPerCycle(payments) {
   return c;
 }
 
-export { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, countsPerCycle, dayOfMonthFromDate, dayOfWeekFromDate, daysUntil, fmtDateShort, fmtLocalISO, fmtMoney, fmtRelative, getService, isAutoPaid, lastDayOfMonth, monthFromDate, monthlyEquivalent, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, paidThisMonth, parseISODate, plannedThisMonth, priceIn, resolveService, seedPayments, todayLocalISO, totalsByMonthlyEquivalent, totalsPerCycle };
+export { nextDueISO, statusDateISO, ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, countsPerCycle, dayOfMonthFromDate, dayOfWeekFromDate, daysUntil, fmtDateShort, fmtLocalISO, fmtMoney, fmtRelative, getService, isAutoPaid, lastDayOfMonth, monthFromDate, monthlyEquivalent, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, paidThisMonth, parseISODate, plannedThisMonth, priceIn, resolveService, seedPayments, todayLocalISO, totalsByMonthlyEquivalent, totalsPerCycle };

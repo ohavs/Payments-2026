@@ -1,7 +1,7 @@
 // Detail sheet, Add Service sheet, and Custom Service builder.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, Icon, IconButton, ServiceBubble, Sheet } from './components.jsx';
-import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, resolveService, todayLocalISO } from './data.jsx';
+import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, nextDueISO, resolveService, statusDateISO, todayLocalISO } from './data.jsx';
 import { Spinner, useConfirm, useToast } from './feedback.jsx';
 
 // ---------- Day-of-cycle picker ----------
@@ -37,7 +37,7 @@ function CyclePicker({ cycle, nextDate, onPickDate }) {
           ))}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8, textAlign: 'start' }}>
-          תיגבה כל יום {labels[current]}' · המועד הבא: {fmtDateShort(nextDate)}
+          תיגבה כל יום {labels[current]}' · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
         </div>
       </div>
     );
@@ -75,7 +75,7 @@ function CyclePicker({ cycle, nextDate, onPickDate }) {
           ))}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
-          תיגבה כל {currentDay} ב{MONTH_NAMES_LONG[currentMonth]} · המועד הבא: {fmtDateShort(nextDate)}
+          תיגבה כל {currentDay} ב{MONTH_NAMES_LONG[currentMonth]} · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
         </div>
       </div>
     );
@@ -101,7 +101,7 @@ function CyclePicker({ cycle, nextDate, onPickDate }) {
         ))}
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
-        תיגבה ב-{currentDay} בכל חודש · המועד הבא: {fmtDateShort(nextDate)}
+        תיגבה ב-{currentDay} בכל חודש · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
       </div>
     </div>
   );
@@ -213,7 +213,7 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
               )}
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2 }}>
-              {CYCLE_LABEL[draft.cycle]} · {fmtRelative(draft.nextDate)}
+              {CYCLE_LABEL[draft.cycle]} · {fmtRelative(statusDateISO(draft))}
             </div>
           </div>
           <div style={{ textAlign: 'end' }}>

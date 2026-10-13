@@ -2,7 +2,7 @@
 // StatsCard (the yellow stats card on home) + ListCard (compact row).
 import { useMemo } from 'react';
 import { Icon, ServiceBubble } from './components.jsx';
-import { CYCLE_LABEL, CYCLE_ORDER, countsPerCycle, fmtMoney, fmtRelative, isAutoPaid, resolveService, totalsByMonthlyEquivalent } from './data.jsx';
+import { CYCLE_LABEL, CYCLE_ORDER, countsPerCycle, fmtMoney, fmtRelative, isAutoPaid, resolveService, statusDateISO, totalsByMonthlyEquivalent } from './data.jsx';
 
 function StatsCard({ paid, planned, count, onClick }) {
   const pct = planned > 0 ? Math.min(100, Math.round(paid / planned * 100)) : 0;
@@ -174,7 +174,7 @@ function ListCard({ payment, onClick, accent }) {
           )}
         </div>
         <div style={{ fontSize: 12, color: dim, marginTop: 2, fontWeight: 500 }}>
-          {fmtRelative(payment.nextDate)} · {CYCLE_LABEL[payment.cycle]}
+          {fmtRelative(statusDateISO(payment))} · {CYCLE_LABEL[payment.cycle]}
         </div>
       </div>
       <div style={{ textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}>

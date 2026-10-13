@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "TZ=Asia/Jerusalem vitest run",
     "lint": "eslint src"
   },
   "dependencies": {

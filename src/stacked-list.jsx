@@ -4,7 +4,7 @@
 // Tap a row → it expands inline; tap again or wait 3s → collapses.
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon, ServiceBubble } from './components.jsx';
-import { CYCLE_LABEL, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, resolveService } from './data.jsx';
+import { CYCLE_LABEL, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, resolveService, statusDateISO } from './data.jsx';
 
 const AUTO_COLLAPSE_MS = 3000;
 
@@ -144,7 +144,7 @@ function PaymentRow({ payment, index, total, isExpanded, isPaidSectionStart, onT
             )}
           </div>
           <div style={{ fontSize: 12, fontWeight: 600, opacity: .65, marginTop: 2 }}>
-            {fmtRelative(payment.nextDate)} · {CYCLE_LABEL[payment.cycle]}
+            {fmtRelative(statusDateISO(payment))} · {CYCLE_LABEL[payment.cycle]}
           </div>
         </div>
         <div style={{ textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}>
@@ -163,7 +163,7 @@ function PaymentRow({ payment, index, total, isExpanded, isPaidSectionStart, onT
             transform: isExpanded ? 'translateY(0)' : 'translateY(8px)',
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <Stat label="תאריך" value={fmtDateShort(payment.nextDate)} />
+              <Stat label="תאריך" value={fmtDateShort(statusDateISO(payment))} />
               <Stat label="תדירות" value={CYCLE_LABEL[payment.cycle]} />
             </div>
             {payment.note && (
