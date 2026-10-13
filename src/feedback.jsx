@@ -37,7 +37,7 @@ function FeedbackProvider({ children }) {
 function ToastViewport({ toasts }) {
   return (
     <div style={{
-      position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+      position: 'fixed', top: 'calc(16px + env(safe-area-inset-top))', left: '50%', transform: 'translateX(-50%)',
       zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8,
       width: 'calc(100% - 32px)', maxWidth: 380, pointerEvents: 'none',
     }}>

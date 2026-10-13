@@ -1,0 +1,94 @@
+name: Android
+
+# Builds the signed APK on every push. On the served branch it also publishes a
+# GitHub Release, which the app's "check for updates" installs from — but only
+# when something that ships in the APK changed since the last release.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SERVED_BRANCH: claude/implement-payments-page-G9fij
+  # Release key fingerprint. Android only installs an update signed by the same
+  # key, so a build signed with anything else must never be published.
+  CERT_SHA256: dc8b1cefd14826bd994d343b338d1c79500e7d3ad416656ff5e4229a74725c0b
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build web and sync into Android
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Version
+        id: v
+        run: |
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          echo "code=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          echo "name=$BASE.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$ANDROID_KEYSTORE_FILE"
+          ./gradlew assembleRelease --no-daemon -PversionCode=${{ steps.v.outputs.code }} -PversionName=${{ steps.v.outputs.name }}
+          rm -f "$ANDROID_KEYSTORE_FILE"
+
+      - name: Check signature
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          "$SIGNER" verify --print-certs "$APK" | tee certs.txt
+          grep -qi "SHA-256 digest: $CERT_SHA256" certs.txt
+          cp "$APK" payments.apk
+          sha256sum payments.apk | cut -d' ' -f1 > payments.apk.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: payments-${{ steps.v.outputs.name }}
+          path: payments.apk
+
+      - name: Publish release
+        if: github.ref_name == env.SERVED_BRANCH
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          SHIPPED="src public index.html android package.json package-lock.json capacitor.config.json"
+          if [ -n "$LAST" ] && git diff --quiet "$LAST" HEAD -- $SHIPPED; then
+            echo "Nothing in the app changed since $LAST; no release."; exit 0
+          fi
+          if [ -z "$LAST" ] || ! git diff --quiet "$LAST" HEAD -- release-notes.md; then
+            cp release-notes.md notes.md
+          else
+            echo "- שיפורים ותיקונים" > notes.md
+          fi
+          printf '\n<!-- update {"versionCode":%s,"sha256":"%s","apk":"payments.apk"} -->\n' \
+            "${{ steps.v.outputs.code }}" "$(cat payments.apk.sha256)" >> notes.md
+          gh release create "v${{ steps.v.outputs.name }}" payments.apk \
+            --target "$GITHUB_SHA" --title "גרסה ${{ steps.v.outputs.name }}" --notes-file notes.md --latest

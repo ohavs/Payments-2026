@@ -1,5 +1,6 @@
 // Shared UI atoms for the payments app
 import React, { useEffect, useRef, useState } from 'react';
+import { pushBackHandler } from './lib/platform.js';
 
 // Brand glyph for a service (logo bubble). Size in px.
 function ServiceBubble({ service, size = 44, dark = false }) {
@@ -121,6 +122,11 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
     const id = requestAnimationFrame(() => setAnimReady(true));
     return () => cancelAnimationFrame(id);
   }, []);
+  // Android back button closes the topmost open sheet. Registered once per
+  // opening (not per render) so the stack keeps the order sheets opened in.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => { if (open) return pushBackHandler(() => onCloseRef.current()); }, [open]);
   // Reset any drag offset whenever the sheet opens/closes; dismiss the keyboard
   // when the sheet closes (covers close via button / backdrop / drag).
   useEffect(() => {
@@ -233,7 +239,7 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
             </div>
           )}
         </div>
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain' }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {children}
         </div>
       </div>

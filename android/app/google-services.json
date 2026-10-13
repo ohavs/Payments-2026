@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "267719533646",
+    "project_id": "schedual-fdde7",
+    "storage_bucket": "schedual-fdde7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:267719533646:android:18a498064f979005734f1f",
+        "android_client_info": {
+          "package_name": "com.ohavs.payments"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "267719533646-ur75agaq3kabvsj6o11lpupkhdjgf228.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ohavs.payments",
+            "certificate_hash": "f74890adf80addbc50e425588a9074199183aeba"
+          }
+        },
+        {
+          "client_id": "267719533646-ks3pjss8b6u4457q6j2rbbvufoh770m1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYQHZN_8UIRzOYmY0UWNM9KjfSC0pxQTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "267719533646-ks3pjss8b6u4457q6j2rbbvufoh770m1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

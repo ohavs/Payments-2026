@@ -1,9 +1,10 @@
 // Main screens: Home, Calendar, Settings
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BudgetDetailSheet, BudgetHeroCard, BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from './budget.jsx';
 import { Chip, Icon, IconButton, Row, Sheet, Toggle } from './components.jsx';
 import { ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, countsPerCycle, fmtMoney, isAutoPaid, monthlyEquivalent, parseISODate, resolveService, statusDateISO, totalsByMonthlyEquivalent, totalsPerCycle } from './data.jsx';
 import { occurrencesBetween } from './lib/recurrence.js';
+import { appVersion, isNative } from './lib/platform.js';
 import { Spinner, useToast } from './feedback.jsx';
 import { useExchangeRates } from './fx.jsx';
 import { DEFAULT_CATEGORIES, ExpenseListSection, MONTH_NAMES_HE, PendingInvitesCard, useLists } from './lists.jsx';
@@ -676,7 +677,9 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 }
 
 // ---------- SETTINGS ----------
-function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSignOut }) {
+function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSignOut, onOpenUpdates }) {
+  const [version, setVersion] = useState(null);
+  useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
   const toast = useToast();
   const [notifPerm, setNotifPerm] = useState(() => notifPermission());
@@ -912,13 +915,20 @@ function SettingsScreen({ user, settings, setSettings, accent, setAccent, onSign
           right={<Icon name="chevron-left" size={18} />} />
       </SettingsGroup>
 
+      {isNative && (
+        <SettingsGroup title="עדכונים">
+          <Row icon="download" label="בדוק עדכונים" sub={version ? `גרסה ${version.name}` : ''}
+            onClick={onOpenUpdates} right={<Icon name="chevron-left" size={16} />} />
+        </SettingsGroup>
+      )}
+
       {/* Account group */}
       <SettingsGroup title="חשבון">
         <Row icon="arrow-right" label="התנתקות" sub={email || 'יציאה מהחשבון'} danger onClick={onSignOut} />
       </SettingsGroup>
 
       <div style={{ textAlign: 'center', color: 'var(--ink-dim)', fontSize: 12, marginTop: 28 }}>
-        תשלומים · גרסה 1.0
+        תשלומים{version ? ` · גרסה ${version.name}` : ''}
       </div>
     </div>
   );

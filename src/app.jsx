@@ -8,6 +8,9 @@ import { CalendarScreen, HomeScreen, SettingsScreen, SubscriptionsScreen } from 
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
 import { TweakColor, TweakRadio, TweakSection, TweaksPanel, useTweaks } from './tweaks-panel.jsx';
 import { notifPermission, registerFcmToken, scanForReminders } from './notifications.jsx';
+import { UpdateSheet } from './update-sheet.jsx';
+import { setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
+import { checkForUpdateQuietly } from './lib/updater.js';
 
 function AppInner() {
   const [t, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
@@ -23,6 +26,22 @@ function AppInner() {
   const [detail, setDetail] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editCustom, setEditCustom] = useState(null);
+  const [update, setUpdate] = useState(null);       // latest release info, when newer
+  const [updateOpen, setUpdateOpen] = useState(false);
+
+  // Android back with no sheet open: other tab → home tab → exit app.
+  useEffect(() => {
+    setBaseBackHandler(() => {
+      if (tab !== 'home') { setTab('home'); return true; }
+      return false;
+    });
+  }, [tab]);
+
+  // Quietly look for a newer APK on launch (Android, at most every 6 hours).
+  useEffect(() => {
+    if (!user) return;
+    checkForUpdateQuietly().then((r) => { if (r?.available) setUpdate(r); });
+  }, [user?.uid]);
 
   // Apply theme + accent via CSS vars
   useEffect(() => {
@@ -43,6 +62,7 @@ function AppInner() {
     // Update PWA theme color to match
     let meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', dark ? '#0B0B0B' : '#F4F4F2');
+    setStatusBarTheme(dark);
     document.documentElement.dir = 'rtl';
     document.documentElement.lang = 'he';
   }, [t.theme, t.accent]);
@@ -103,6 +123,8 @@ function AppInner() {
       <div style={{
         width: '100%', maxWidth: 480, height: '100vh', position: 'relative',
         background: 'var(--bg)', overflow: 'hidden',
+        // Android draws edge-to-edge: keep content clear of the status bar.
+        paddingTop: 'env(safe-area-inset-top)',
         display: 'flex', flexDirection: 'column',
       }} data-screen-label={`tab: ${tab}`}>
         <div className="bg-orbs" aria-hidden="true">
@@ -110,6 +132,7 @@ function AppInner() {
         </div>
         <div style={{
           flex: 1, minHeight: 0,
+          paddingBottom: 'env(safe-area-inset-bottom)',
           // home + subs manage their own internal scrolling
           overflowY: (tab === 'home' || tab === 'subs') ? 'hidden' : 'auto',
           overflowX: 'hidden',
@@ -147,9 +170,21 @@ function AppInner() {
             accent={t.accent}
             setAccent={v => setTweak('accent', v)}
             onSignOut={handleSignOut}
+            onOpenUpdates={() => setUpdateOpen(true)}
           />
         )}
         </div>
+
+        {update && !updateOpen && (
+          <button onClick={() => setUpdateOpen(true)} style={{
+            position: 'absolute', top: 'calc(10px + env(safe-area-inset-top))', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 60, border: 'none', cursor: 'pointer', borderRadius: 999, padding: '9px 16px',
+            background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
+            boxShadow: '0 10px 24px -8px rgba(0,0,0,.35)', whiteSpace: 'nowrap',
+          }}>
+            גרסה {update.latest.versionName} זמינה · עדכן
+          </button>
+        )}
 
         <BottomNav tab={tab} setTab={setTab} onAdd={() => setAddOpen(true)} />
 
@@ -161,6 +196,7 @@ function AppInner() {
           onDelete={deletePayment}
           onEditCustom={(p) => { setDetail(null); setEditCustom(p); }}
         />
+        <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
         <AddSheet
           open={addOpen}
           onClose={() => setAddOpen(false)}
@@ -204,7 +240,7 @@ function BottomNav({ tab, setTab, onAdd }) {
   ];
   return (
     <div style={{
-      position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+      position: 'fixed', bottom: 'calc(16px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
       width: 'calc(100% - 32px)', maxWidth: 448, zIndex: 50,
       background: 'var(--accent)',
       borderRadius: 999, padding: 6,

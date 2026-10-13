@@ -4,7 +4,9 @@
 //   users/{uid}/settings/main        — single settings document
 //   users/{uid}/payments/{paymentId} — one document per tracked payment
 import React from 'react';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import firebase from './lib/firebase.js';
+import { isNative } from './lib/platform.js';
 
 const fbAuth = firebase.auth();
 const fbDb = firebase.firestore();
@@ -31,6 +33,11 @@ function useAuthUser() {
   }, []);
 
   const signInGoogle = React.useCallback(async () => {
+    if (isNative) {
+      const res = await FirebaseAuthentication.signInWithGoogle();
+      const cred = firebase.auth.GoogleAuthProvider.credential(res.credential?.idToken);
+      return fbAuth.signInWithCredential(cred);
+    }
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     return fbAuth.signInWithPopup(provider);
@@ -38,7 +45,11 @@ function useAuthUser() {
 
   const signInAnonymous = React.useCallback(() => fbAuth.signInAnonymously(), []);
 
-  const signOut = React.useCallback(() => fbAuth.signOut(), []);
+  const signOut = React.useCallback(async () => {
+    // Also forget the Android account choice so the picker shows next time.
+    if (isNative) await FirebaseAuthentication.signOut().catch(() => {});
+    return fbAuth.signOut();
+  }, []);
 
   return { user, loading, signInGoogle, signInAnonymous, signOut };
 }

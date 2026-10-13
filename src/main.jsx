@@ -1,11 +1,12 @@
 import ReactDOM from 'react-dom/client';
 import { App } from './app.jsx';
+import { isNative } from './lib/platform.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 
 // Service worker: offline shell + FCM background push. Network-first inside the
 // SW handles freshness; poll for updates and reload once a new one takes control.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if (import.meta.env.PROD && !isNative && 'serviceWorker' in navigator) {
   const wasControlled = !!navigator.serviceWorker.controller;
   let didReload = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {

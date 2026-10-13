@@ -10,7 +10,8 @@ function LoginScreen({ onSignInGoogle, onSignInAnonymous }) {
     setBusy('google');
     try { await onSignInGoogle(); }
     catch (e) {
-      toast(e?.code === 'auth/popup-closed-by-user' ? 'ההתחברות בוטלה' : 'שגיאה בהתחברות', { type: 'error' });
+      const cancelled = e?.code === 'auth/popup-closed-by-user' || /cancel/i.test(e?.message || '');
+      toast(cancelled ? 'ההתחברות בוטלה' : 'שגיאה בהתחברות', { type: 'error' });
       setBusy(null);
     }
   };
