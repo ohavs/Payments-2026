@@ -188,9 +188,13 @@ function Sheet({ open, onClose, title, children, height = '88%' }) {
   const panelTransition = dragging ? 'none' : (animReady ? 'transform .45s cubic-bezier(.22,1,.36,1)' : 'none');
 
   return (
-    <div style={{
+    <div aria-hidden={!open} style={{
       position: 'absolute', inset: 0, zIndex: 100,
       pointerEvents: open ? 'auto' : 'none',
+      // Hidden once the slide-out finishes: a closed sheet can't take focus or
+      // be scrolled into view (focusing an input scrolls overflow:hidden parents).
+      visibility: open ? 'visible' : 'hidden',
+      transition: open || !animReady ? 'visibility 0s' : 'visibility 0s linear .45s',
     }}>
       <div onClick={onClose} style={{
         position: 'absolute', inset: 0,

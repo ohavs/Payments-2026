@@ -10,6 +10,7 @@ import { notifPermission, registerFcmToken, scanForReminders } from './notificat
 import { QuickAddSheet } from './quick-add.jsx';
 import { ExpensesScreen } from './screens/expenses.jsx';
 import { SubscriptionsScreen } from './screens/subscriptions.jsx';
+import { SummaryScreen } from './screens/summary.jsx';
 import { SettingsScreen } from './screens.jsx';
 import { SharedSpaceSheet } from './spaces.jsx';
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
@@ -221,7 +222,9 @@ function AppInner() {
     }}>
       <div style={{
         width: '100%', maxWidth: 480, height: '100vh', position: 'relative',
-        background: 'var(--bg)', overflow: 'hidden',
+        // clip, not hidden: nothing (focus, scrollIntoView) can scroll the shell
+        // and drag the tab bar or a sheet out of place.
+        background: 'var(--bg)', overflow: 'clip',
         display: 'flex', flexDirection: 'column',
         // Android draws edge-to-edge: keep content clear of the status bar.
         paddingTop: 'env(safe-area-inset-top)',
@@ -238,6 +241,7 @@ function AppInner() {
               setSettings={setSpaceSettings}
               onQuickAdd={openQuickAdd}
               onCreateShared={() => setSharedOpen(true)}
+              onOpenSummary={() => { haptic('tap'); setTab('summary'); }}
               suggestionsCard={(
                 <SuggestionsCard suggestions={detected.suggestions} categories={categories} items={lists.items}
                   onAdd={addSuggestions} onDismiss={(l) => detected.remove(l.map((s) => s.id))} onEdit={editSuggestion}
@@ -254,6 +258,16 @@ function AppInner() {
               settings={settings}
               onOpenPayment={(p) => setDetail(p)}
               onOpenAdd={() => setAddSubOpen(true)}
+            />
+          )}
+          {tab === 'summary' && (
+            <SummaryScreen
+              lists={lists}
+              categories={categories}
+              payments={subs}
+              settings={spaceSettings}
+              setSettings={setSpaceSettings}
+              onOpenSubs={() => { haptic('tap'); setTab('subs'); }}
             />
           )}
           {tab === 'settings' && (
@@ -335,8 +349,8 @@ function App() {
   );
 }
 
-// Bottom bar: הוצאות · מנויים · (+) · הגדרות. Inactive icons go grey; the
-// active one pops in colour with a dot under its label.
+// Bottom bar: הוצאות · מנויים · (+) · סיכום · הגדרות, with + in the middle.
+// Inactive icons go grey; the active one pops in colour with a dot under it.
 function TabBar({ tab, setTab, onAdd, addOpen }) {
   const item = (id, label) => {
     const on = tab === id;
@@ -379,6 +393,7 @@ function TabBar({ tab, setTab, onAdd, addOpen }) {
           </span>
         </button>
       </div>
+      {item('summary', 'סיכום')}
       {item('settings', 'הגדרות')}
     </nav>
   );

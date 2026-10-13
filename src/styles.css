@@ -140,3 +140,8 @@ input[type="number"], input[type="date"], input[type="time"] { direction: ltr; t
 /* Inactive nav icons */
 :root { --nav-off-fill: #E8E8EA; --nav-off-stroke: #A1A1AA; }
 :root[data-theme="dark"] { --nav-off-fill: #34343A; --nav-off-stroke: #74747E; }
+
+/* Number fields without the browser's spinner arrows. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }

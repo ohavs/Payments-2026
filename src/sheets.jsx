@@ -1,111 +1,10 @@
 // Detail sheet, Add Service sheet, and Custom Service builder.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, Icon, IconButton, ServiceBubble, Sheet } from './components.jsx';
-import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, nextDueISO, resolveService, statusDateISO, todayLocalISO } from './data.jsx';
+import { CATEGORIES, CURRENCIES, CYCLE_LABEL, MONTH_NAMES_LONG, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, nextDueISO, resolveService, statusDateISO, todayLocalISO } from './data.jsx';
 import { Spinner, useConfirm, useToast } from './feedback.jsx';
-
-// ---------- Day-of-cycle picker ----------
-// Replaces the absolute-date input. The user picks a recurrence day; we
-// compute the next occurrence and store it as nextDate.
-function CyclePicker({ cycle, nextDate, onPickDate }) {
-  if (cycle === 'daily') {
-    return (
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תזמון</div>
-        <div style={{ fontSize: 14, color: 'var(--ink-dim)' }}>
-          תשלום יומי – נגבה כל יום
-        </div>
-      </div>
-    );
-  }
-
-  if (cycle === 'weekly') {
-    const current = nextDate ? dayOfWeekFromDate(nextDate) : new Date().getDay();
-    const labels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
-    return (
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>יום בשבוע</div>
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between' }}>
-          {labels.map((lbl, i) => (
-            <button key={i} onClick={() => onPickDate(nextDateForDayOfWeek(i))} style={{
-              flex: 1, padding: '12px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: current === i ? 'var(--accent)' : 'var(--surface-3)',
-              color: current === i ? 'var(--accent-fg)' : 'var(--ink)',
-              fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
-              transition: 'background .15s ease',
-            }}>{lbl}</button>
-          ))}
-        </div>
-        <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8, textAlign: 'start' }}>
-          תיגבה כל יום {labels[current]}' · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
-        </div>
-      </div>
-    );
-  }
-
-  if (cycle === 'yearly') {
-    const currentMonth = nextDate ? monthFromDate(nextDate) : new Date().getMonth();
-    const currentDay = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
-    const maxDay = lastDayOfMonth(2024, currentMonth); // 2024 is a leap year — show full 29 in Feb
-    return (
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>חודש</div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginInline: -4, paddingInline: 4 }} className="hide-scroll">
-          {MONTH_NAMES_SHORT.map((mLbl, mIdx) => (
-            <button key={mIdx} onClick={() => onPickDate(nextDateForMonthDay(mIdx, currentDay))} style={{
-              padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: currentMonth === mIdx ? 'var(--accent)' : 'var(--surface-3)',
-              color: currentMonth === mIdx ? 'var(--accent-fg)' : 'var(--ink)',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-              flexShrink: 0, transition: 'background .15s ease',
-            }}>{mLbl}</button>
-          ))}
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 14, marginBottom: 10 }}>יום בחודש</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-          {Array.from({ length: maxDay }, (_, i) => i + 1).map(d => (
-            <button key={d} onClick={() => onPickDate(nextDateForMonthDay(currentMonth, d))} style={{
-              aspectRatio: '1 / 1', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: currentDay === d ? 'var(--accent)' : 'var(--surface-3)',
-              color: currentDay === d ? 'var(--accent-fg)' : 'var(--ink)',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-              fontVariantNumeric: 'tabular-nums',
-              transition: 'background .15s ease',
-            }}>{d}</button>
-          ))}
-        </div>
-        <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
-          תיגבה כל {currentDay} ב{MONTH_NAMES_LONG[currentMonth]} · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
-        </div>
-      </div>
-    );
-  }
-
-  // monthly
-  const currentDay = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
-  return (
-    <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>יום בחודש</div>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6,
-      }}>
-        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-          <button key={d} onClick={() => onPickDate(nextDateForDayOfMonth(d))} style={{
-            aspectRatio: '1 / 1', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: currentDay === d ? 'var(--accent)' : 'var(--surface-3)',
-            color: currentDay === d ? 'var(--accent-fg)' : 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-            fontVariantNumeric: 'tabular-nums',
-            transition: 'background .15s ease',
-          }}>{d}</button>
-        ))}
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--ink-dim)', marginTop: 8 }}>
-        תיגבה ב-{currentDay} בכל חודש · המועד הבא: {fmtDateShort(nextDueISO({ cycle, nextDate }))}
-      </div>
-    </div>
-  );
-}
+import { occurrencesBetween } from './lib/recurrence.js';
+import { Segmented } from './ui/kit.jsx';
 
 // ---------- Edit field row ----------
 function EditField({ label, value, onChange, type = 'text', placeholder, suffix }) {
@@ -129,6 +28,133 @@ function EditField({ label, value, onChange, type = 'text', placeholder, suffix 
         {suffix && <span style={{ color: 'var(--ink-dim)', fontSize: 15, fontWeight: 600 }}>{suffix}</span>}
       </div>
     </label>
+  );
+}
+
+// ---------- Subscription form (add + detail) ----------
+function FieldLabel({ children }) {
+  return <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-dim)', margin: '20px 2px 9px' }}>{children}</div>;
+}
+
+const CYCLE_TABS = ['monthly', 'yearly', 'weekly', 'daily'];
+const WEEKDAYS_HE = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+
+// Keep the same day when switching cycle, so the picker shows something sane.
+function reanchor(cycle, anchorISO) {
+  const anchor = anchorISO || todayLocalISO();
+  const m = monthFromDate(anchor);
+  const d = dayOfMonthFromDate(anchor);
+  const w = dayOfWeekFromDate(anchor);
+  return cycle === 'yearly' ? nextDateForMonthDay(m, d)
+    : cycle === 'monthly' ? nextDateForDayOfMonth(d)
+    : cycle === 'weekly' ? nextDateForDayOfWeek(w)
+    : todayLocalISO();
+}
+
+// One scrolling row of chips; the selected one starts in view.
+function ChipRow({ items, value, onPick, round }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    // Centre the selected chip by scrolling the row only (scrollIntoView would
+    // also scroll the page while the sheet is still sliding in).
+    const row = ref.current;
+    const el = row?.querySelector('[data-on="1"]');
+    if (!el) return;
+    const r = row.getBoundingClientRect();
+    const e = el.getBoundingClientRect();
+    row.scrollLeft += (e.left + e.width / 2) - (r.left + r.width / 2);
+  }, []);
+  return (
+    <div ref={ref} className="hide-scroll" style={{ display: 'flex', gap: 7, overflowX: 'auto', margin: '0 -22px', padding: '2px 22px' }}>
+      {items.map(({ id, label }) => {
+        const on = id === value;
+        return (
+          <button key={id} data-on={on ? '1' : '0'} onClick={() => onPick(id)} className="press" style={{
+            flexShrink: 0, minWidth: round ? 44 : undefined, height: 44, padding: round ? 0 : '0 15px',
+            borderRadius: round ? '50%' : 14, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            background: on ? 'var(--ink)' : 'var(--surface-2)', color: on ? 'var(--bg)' : 'var(--ink)',
+            fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums', transition: 'background-color .15s ease',
+          }}>{label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SubscriptionForm({ value, onChange }) {
+  const { price, currency = '₪', cycle = 'monthly', nextDate, note } = value;
+  const [priceText, setPriceText] = useState(price ? String(price) : '');
+  // The price can also change from outside (a catalog default arriving).
+  useEffect(() => {
+    if ((parseFloat(priceText) || 0) !== (Number(price) || 0)) setPriceText(price ? String(price) : '');
+  }, [price]);
+  const setPrice = (raw) => {
+    const t = raw.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').replace(/^(\d*\.\d{0,2}).*$/, '$1');
+    setPriceText(t);
+    onChange({ price: parseFloat(t) || 0 });
+  };
+  const month = nextDate ? monthFromDate(nextDate) : new Date().getMonth();
+  const day = nextDate ? dayOfMonthFromDate(nextDate) : new Date().getDate();
+  const weekday = nextDate ? dayOfWeekFromDate(nextDate) : new Date().getDay();
+  const days = (n) => Array.from({ length: n }, (_, i) => ({ id: i + 1, label: i + 1 }));
+  const nextISO = nextDueISO({ cycle, nextDate });
+
+  return (
+    <div style={{ padding: '0 22px' }}>
+      <div style={{ background: 'var(--surface-2)', borderRadius: 24, padding: '16px 18px 14px', textAlign: 'center' }}>
+        <div dir="ltr" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6 }}>
+          <span style={{ fontSize: 30, fontWeight: 800 }}>{currency}</span>
+          <input aria-label="סכום" inputMode="decimal" value={priceText} placeholder="0" onChange={(e) => setPrice(e.target.value)} style={{
+            width: `${Math.max(1, priceText.length || 1) + 0.6}ch`, maxWidth: '100%', textAlign: 'left',
+            background: 'transparent', border: 'none', outline: 'none', padding: 0, color: 'var(--ink)',
+            fontFamily: 'inherit', fontSize: 48, fontWeight: 800, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+          }} />
+        </div>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8 }}>
+          {CURRENCIES.map((c) => (
+            <Chip key={c} active={currency === c} onClick={() => onChange({ currency: c })} style={{ padding: '6px 13px' }}>{c}</Chip>
+          ))}
+        </div>
+      </div>
+
+      <FieldLabel>כל כמה זמן</FieldLabel>
+      <Segmented options={CYCLE_TABS.map((c) => ({ id: c, label: CYCLE_LABEL[c] }))} value={cycle}
+        onChange={(c) => onChange({ cycle: c, nextDate: reanchor(c, nextDate) })} />
+
+      {cycle !== 'daily' && <FieldLabel>{cycle === 'weekly' ? 'באיזה יום' : cycle === 'yearly' ? 'מתי בשנה' : 'באיזה יום בחודש'}</FieldLabel>}
+      {cycle === 'monthly' && (
+        <ChipRow round items={days(31)} value={day} onPick={(d) => onChange({ nextDate: nextDateForDayOfMonth(d) })} />
+      )}
+      {cycle === 'weekly' && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {WEEKDAYS_HE.map((lbl, i) => (
+            <button key={i} onClick={() => onChange({ nextDate: nextDateForDayOfWeek(i) })} className="press" style={{
+              flex: 1, height: 44, borderRadius: 14, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: weekday === i ? 'var(--ink)' : 'var(--surface-2)', color: weekday === i ? 'var(--bg)' : 'var(--ink)',
+              fontSize: 15, fontWeight: 800,
+            }}>{lbl}</button>
+          ))}
+        </div>
+      )}
+      {cycle === 'yearly' && (
+        <>
+          <ChipRow items={MONTH_NAMES_LONG.map((m, i) => ({ id: i, label: m }))} value={month}
+            onPick={(m) => onChange({ nextDate: nextDateForMonthDay(m, Math.min(day, lastDayOfMonth(2024, m))) })} />
+          <div style={{ height: 8 }} />
+          <ChipRow round items={days(lastDayOfMonth(2024, month))} value={day}
+            onPick={(d) => onChange({ nextDate: nextDateForMonthDay(month, d) })} />
+        </>
+      )}
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink-dim)', margin: '12px 2px 0' }}>
+        {cycle === 'daily' ? 'נגבה כל יום' : `החיוב הבא: ${fmtDateShort(nextISO)} · ${fmtRelative(nextISO)}`}
+      </div>
+
+      <FieldLabel>הערה</FieldLabel>
+      <input value={note || ''} onChange={(e) => onChange({ note: e.target.value })} placeholder="לא חובה, למשל: חבילת משפחה" style={{
+        width: '100%', height: 50, border: 'none', outline: 'none', borderRadius: 16, background: 'var(--surface-2)',
+        color: 'var(--ink)', padding: '0 16px', fontFamily: 'inherit', fontSize: 15.5, fontWeight: 600,
+      }} />
+    </div>
   );
 }
 
@@ -175,7 +201,10 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
   const service = resolveService(draft);
   const isCustom = !!draft.customService;
   const paid = isAutoPaid(draft);
-  const update = (patch) => setDraft({ ...draft, ...patch });
+  const update = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const pastCharges = payment ? occurrencesBetween(payment, yearAgo, yesterday).reverse().slice(0, 6) : [];
   const save = async () => {
     setSaving(true);
     await onSave(draft);
@@ -208,17 +237,12 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
               {paid && (
                 <span style={{
                   fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
-                  background: 'rgba(34,197,94,.18)', color: '#22C55E',
+                  background: 'var(--accent-soft)', color: 'var(--accent-ink)',
                 }}>שולם אוטומטית</span>
               )}
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2 }}>
               {CYCLE_LABEL[draft.cycle]} · {fmtRelative(statusDateISO(draft))}
-            </div>
-          </div>
-          <div style={{ textAlign: 'end' }}>
-            <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
-              {fmtMoney(draft.price, draft.currency)}
             </div>
           </div>
         </div>
@@ -237,49 +261,13 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
         )}
       </div>
 
-      {/* Editable fields */}
-      <div style={{ background: 'var(--surface-2)', borderRadius: 20, margin: '0 22px' }}>
-        <EditField label="סכום" value={draft.price} type="number" onChange={(v) => update({ price: v })} suffix={draft.currency} />
-
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>מטבע</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {CURRENCIES.map(c => (
-              <Chip key={c} active={draft.currency === c} onClick={() => update({ currency: c })}>{c}</Chip>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תדירות</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {CYCLE_ORDER.map(c => (
-              <Chip key={c} active={draft.cycle === c} onClick={() => {
-                // Re-anchor nextDate against the new cycle so the picker shows a sane day
-                const m = monthFromDate(draft.nextDate);
-                const d = dayOfMonthFromDate(draft.nextDate);
-                const w = dayOfWeekFromDate(draft.nextDate);
-                const newDate =
-                  c === 'yearly'  ? nextDateForMonthDay(m, d) :
-                  c === 'monthly' ? nextDateForDayOfMonth(d) :
-                  c === 'weekly'  ? nextDateForDayOfWeek(w) :
-                  todayLocalISO();
-                update({ cycle: c, nextDate: newDate });
-              }}>{CYCLE_LABEL[c]}</Chip>
-            ))}
-          </div>
-        </div>
-
-        <CyclePicker cycle={draft.cycle} nextDate={draft.nextDate}
-          onPickDate={(v) => update({ nextDate: v })} />
-        <EditField label="הערה" value={draft.note} onChange={(v) => update({ note: v })} placeholder="לדוגמה: חבילת משפחה" />
-      </div>
+      <SubscriptionForm key={draft.id} value={draft} onChange={update} />
 
       {/* Delete */}
       <div style={{ padding: '16px 22px 0' }}>
         <button onClick={requestDelete} style={{
           width: '100%', padding: '12px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
-          background: 'transparent', color: '#FF6B6B',
+          background: 'transparent', color: 'var(--danger)',
           fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}>
@@ -288,32 +276,23 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
         </button>
       </div>
 
-      {/* History (mock) */}
-      <div style={{ padding: '22px 22px 10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <Icon name="history" size={16} color="var(--ink-dim)" />
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink-dim)', letterSpacing: '-0.01em' }}>
-            היסטוריית תשלומים
-          </h3>
-        </div>
-        <div style={{ background: 'var(--surface-2)', borderRadius: 18, overflow: 'hidden' }}>
-          {[1,2,3,4].map(i => {
-            const d = new Date(); d.setMonth(d.getMonth() - i);
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderBottom: i < 4 ? '1px solid var(--divider)' : 'none',
+      {/* Past charges, from the schedule */}
+      {pastCharges.length > 0 && (
+        <div style={{ padding: '14px 22px 10px' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-dim)', margin: '0 2px 9px' }}>חיובים אחרונים</div>
+          <div style={{ background: 'var(--surface-2)', borderRadius: 18, overflow: 'hidden' }}>
+            {pastCharges.map((d, i) => (
+              <div key={d.getTime()} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px',
+                borderTop: i ? '1px solid var(--divider)' : 'none',
               }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{fmtDateShort(d.toISOString())} · {d.getFullYear()}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtMoney(draft.price, draft.currency)}
-                </div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{d.getDate()} ב{MONTH_NAMES_LONG[d.getMonth()]} {d.getFullYear()}</div>
+                <div style={{ fontSize: 14.5, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(payment.price, payment.currency)}</div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Save bar */}
       <div style={{
@@ -615,34 +594,13 @@ function AddSheet({ open, onClose, onAdd }) {
           </div>
         </div>
 
-        <div style={{ background: 'var(--surface-2)', borderRadius: 20, margin: '0 22px' }}>
-          <EditField label="סכום" value={price} type="number" onChange={setPrice} suffix={currency} />
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>מטבע</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {CURRENCIES.map(c => (<Chip key={c} active={currency === c} onClick={() => setCurrency(c)}>{c}</Chip>))}
-            </div>
-          </div>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 8 }}>תדירות</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {CYCLE_ORDER.map(c => (<Chip key={c} active={cycle === c} onClick={() => {
-                const anchor = nextDate || todayLocalISO();
-                const m = monthFromDate(anchor);
-                const d = dayOfMonthFromDate(anchor);
-                const w = dayOfWeekFromDate(anchor);
-                const newDate =
-                  c === 'yearly'  ? nextDateForMonthDay(m, d) :
-                  c === 'monthly' ? nextDateForDayOfMonth(d) :
-                  c === 'weekly'  ? nextDateForDayOfWeek(w) :
-                  todayLocalISO();
-                setCycle(c); setNextDate(newDate);
-              }}>{CYCLE_LABEL[c]}</Chip>))}
-            </div>
-          </div>
-          <CyclePicker cycle={cycle} nextDate={nextDate} onPickDate={setNextDate} />
-          <EditField label="הערה" value={note} onChange={setNote} placeholder="אופציונלי" />
-        </div>
+        <SubscriptionForm key={picked.id} value={{ price, currency, cycle, nextDate, note }} onChange={(p) => {
+          if ('price' in p) setPrice(p.price);
+          if ('currency' in p) setCurrency(p.currency);
+          if ('cycle' in p) setCycle(p.cycle);
+          if ('nextDate' in p) setNextDate(p.nextDate);
+          if ('note' in p) setNote(p.note);
+        }} />
 
         <div style={{ height: 24 }} />
 

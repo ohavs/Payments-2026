@@ -30,6 +30,13 @@ export function NavIcon({ name, active, size = 28 }) {
         <circle cx="12" cy="15.2" r="2.3" fill={active ? '#4F46E5' : 'var(--nav-off-stroke, #A1A1AA)'} />
       </Svg>
     );
+    case 'summary': return (
+      <Svg size={size}>
+        <rect x="3.6" y="11.4" width="4.6" height="9.2" rx="1.6" fill={on('#22A45D')} {...st} />
+        <rect x="9.7" y="4" width="4.6" height="16.6" rx="1.6" fill={on('#FFC93C')} {...st} />
+        <rect x="15.8" y="8" width="4.6" height="12.6" rx="1.6" fill={on('#4F46E5')} {...st} />
+      </Svg>
+    );
     case 'settings': return (
       <Svg size={size}>
         <path d="M19.25 10.53 L21.52 10.76 L21.52 13.24 L19.25 13.47 L18.17 16.09 L19.61 17.85 L17.85 19.61 L16.09 18.17 L13.47 19.25 L13.24 21.52 L10.76 21.52 L10.53 19.25 L7.91 18.17 L6.15 19.61 L4.39 17.85 L5.83 16.09 L4.75 13.47 L2.48 13.24 L2.48 10.76 L4.75 10.53 L5.83 7.91 L4.39 6.15 L6.15 4.39 L7.91 5.83 L10.53 4.75 L10.76 2.48 L13.24 2.48 L13.47 4.75 L16.09 5.83 L17.85 4.39 L19.61 6.15 L18.17 7.91 Z" fill={on('#4F46E5')} {...st} />

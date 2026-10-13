@@ -1,7 +1,7 @@
 // Expenses tab: how much went out this month, then every expense by day.
 // Details (pace, categories, daily chart) live one tap away in the summary.
 import React from 'react';
-import { BudgetDetailSheet, BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
+import { BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
 import { fmtMoney } from '../data.jsx';
 import { useToast } from '../feedback.jsx';
 import {
@@ -29,7 +29,7 @@ function subtitle(it) {
   return [it.title && it.title !== it.group ? it.group : null, it.note].filter(Boolean).join(' · ');
 }
 
-function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd, onCreateShared, suggestionsCard }) {
+function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd, onCreateShared, onOpenSummary, suggestionsCard }) {
   const toast = useToast();
   const now = new Date();
   const [view, setView] = React.useState({ y: now.getFullYear(), m: now.getMonth() });
@@ -38,7 +38,6 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
   const shared = isSharedList(lists.activeList);
   React.useEffect(() => { setFilter(null); setPayer(null); }, [lists.activeListId]);
   const [editItem, setEditItem] = React.useState(null);
-  const [summaryOpen, setSummaryOpen] = React.useState(false);
   const [budgetOpen, setBudgetOpen] = React.useState(false);
   const [manageOpen, setManageOpen] = React.useState(false);
 
@@ -114,7 +113,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14 }}>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink-dim)' }}>הוצאת ב{monthName}</div>
-          <Pill tone="neutral" onClick={() => { haptic('tap'); setSummaryOpen(true); }}>
+          <Pill tone="neutral" onClick={onOpenSummary}>
             סיכום
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </Pill>
@@ -231,9 +230,6 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
         renderPayer={shared ? (value, set) => <PayerPicker list={lists.activeList} value={value} onChange={set} /> : null}
         onSave={(item) => { lists.ops.updateItem(lists.activeListId, item); setEditItem(null); toast('נשמר', { type: 'success' }); }}
         onDelete={(id) => { haptic('warning'); lists.ops.removeItem(lists.activeListId, id); setEditItem(null); toast('נמחק', { type: 'info' }); }} />
-      <BudgetDetailSheet open={summaryOpen} onClose={() => setSummaryOpen(false)}
-        stats={stats} prevStats={prevStats} monthLabel={monthLabel}
-        onOpenSettings={() => { setSummaryOpen(false); setTimeout(() => setBudgetOpen(true), 220); }} />
       <BudgetSettingsSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
         settings={settings} setSettings={setSettings} categories={categories} subsMonthly={subsMonthly} />
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
