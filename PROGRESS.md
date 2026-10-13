@@ -51,7 +51,7 @@
 - [x] גיליון סגור מוסתר (`visibility`) והמעטפת `overflow: clip`, כדי ש־focus/scroll לא יזיזו את המסך
 - [x] Gmail: מסך ההסכמה במצב Testing. נוספו כ־Test users: ohav88, ohav.ecommerce, maitesilvaf. Publish חסום עד השלמת Branding. בבדיקה, אישור משתמש פג אחרי 7 ימים (אנחנו מבקשים טוקן בכל סריקה, אז רק ההסכמה תופיע שוב)
 - [x] בונה שירות מותאם אישית בסגנון החדש. ניהול מרחבים כבר קרוב לסגנון החדש
-- [ ] תזכורות למנויים משותפים בצד השרת: `functions/` קורא רק `users/{uid}/payments` (וממילא לא נפרס)
+- [x] תזכורות למנויים משותפים בצד השרת (`paymentReminders`, ראו שלב 3 צד שרת)
 - [x] ייצוא CSV: הגדרות ← "ייצוא הוצאות" (`src/lib/export.js`). אנדרואיד: Filesystem + Share. שם קובץ ASCII (שם עברי נזרק בדפדפן)
 - [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
 - [x] שלב 3 (צד שרת): `functions/index.js` נפרס מה־CI (`deploy.yml`, אחרון). Blaze פעיל
@@ -68,8 +68,8 @@
 - [x] Gmail אוטומטי (אנדרואיד): `GmailTokenPlugin.silentToken` (GoogleAuthUtil, בלי UI). אחרי סריקה ידנית ראשונה, סריקה שקטה של 30 יום בכל פתיחה/חזרה (פעם ב־4 שעות), והקבלות נכנסות לכרטיס ההצעות יחד עם Wallet (`useGmailInbox`, localStorage)
 - [ ] **ממתין לאישור המשתמש: Play Protect חוסם התקנה בטלפון חדש** ("האפליקציה נחסמה כדי להגן על המכשיר", בלי "התקן בכל זאת")
   - הסיבה: הגנת ההונאה של Google חוסמת התקנה מדפדפן/וואטסאפ/מנהל קבצים של אפליקציה שמצהירה על NotificationListenerService (אצלנו: זיהוי תשלומים מ־Wallet). עדכונים מתוך האפליקציה אינם ממקור כזה
-  - טעות: ב־v2.0.39 נבנתה גרסת `lite` נפרדת בלי אישור. המשתמש לא רוצה גרסאות שונות: **צריך לבטל** (`android/app/src/lite/`, buildType `lite` ב־`build.gradle`, `available` ב־`PaymentDetectPlugin`, `checkFullBuild`/`appVariant`/variant ב־`updater.js` ובבדיקות, `mode="full"` ב־`update-sheet.jsx`, `onOpenFullBuild` ב־`app.jsx`/`screens.jsx`, lite ב־`android.yml` וב־`android-smoke.sh`). כל release ימשיך להכיל רק `payments.apk`. אפליקציות שכבר בלייט יעודכנו למלא דרך המעדכן הרגיל (בלי `lite` ב־marker, parseRelease הישן בוחר `payments.apk`)
-  - ההמלצה שהוצגה: גרסה אחת לכולם. בטלפון חדש מתקינים פעם אחת עם Play Protect כבוי לדקה (Play Store ← תמונה ← Play Protect ← ⚙ ← כיבוי סריקה, התקנה, הפעלה מחדש). להוסיף דף התקנה באתר (`/install`) עם הקישור וההוראות
+  - ב־v2.0.39 נבנתה גרסת `lite` נפרדת בלי אישור. **בוטלה** (revert): כל release מכיל רק `payments.apk`, ואפליקציות בלייט מתעדכנות למלא דרך המעדכן הרגיל
+  - ההמלצה שהוצגה: גרסה אחת לכולם. בטלפון חדש מתקינים פעם אחת עם Play Protect כבוי לדקה (Play Store ← תמונה ← Play Protect ← ⚙ ← כיבוי סריקה, התקנה, הפעלה מחדש). דף התקנה באתר (`/install`) עם הוראות כיבוי Play Protect: לא נוסף. נחסם ע"י מסנן הבטיחות של Claude (הוראה ציבורית לכבות הגנה), ממתין להחלטת המשתמש
   - חלופות שהוצגו: להסיר את קריאת ההתראות לכולם (Gmail נשאר); Google Play במסלול בדיקות (25$, בלי המעדכן הפנימי, נגד ההחלטה "בלי Play")
   - בהמשך: אימות מפתחים של Google לאפליקציות שמותקנות מחוץ ל־Play. בתוקף מ־30.9.2026 בברזיל, אינדונזיה, סינגפור ותאילנד, ובשאר העולם ב־2027. יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [ ] Gmail במצב Testing: ההסכמה פגה כל 7 ימים. פתרון: Publish (דורש Branding). דף פרטיות: https://schedual-fdde7.web.app/privacy.html

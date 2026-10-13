@@ -303,7 +303,7 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 }
 
 // ---------- SETTINGS ----------
-function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates, onOpenFullBuild, onOpenGmail }) {
+function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates, onOpenGmail }) {
   const [version, setVersion] = useState(null);
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
@@ -341,8 +341,6 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
     return () => { h.then((x) => x.remove()); };
   }, []);
   const toggleDetect = async (on) => {
-    // The lite build (first install from a browser or WhatsApp) has no listener.
-    if (on && detect.available === false) { onOpenFullBuild(); return; }
     setDetect(await setDetectEnabled(on));
     if (!on) return;
     if ((await ensureNativeNotifPermission()) !== 'granted') toast('בלי הרשאת התראות ההצעות יופיעו רק באפליקציה', { type: 'info' });
@@ -352,8 +350,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       setTimeout(() => openDetectAccess(), 700);
     }
   };
-  const detectSub = detect.available === false ? 'דורש את הגרסה המלאה. לחיצה להתקנה'
-    : !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
+  const detectSub = !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
     : detect.access ? 'פעיל · תשלום חדש יופיע כהצעה' : 'צריך לאשר גישה להתראות';
 
   const exportExpenses = async () => {
@@ -515,7 +512,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
             <Row icon="card" tint="var(--mint)" label="תשלומים מהטלפון" sub={detectSub}
               right={<Toggle checked={detect.enabled} onChange={toggleDetect} />} />
           )}
-          {isNative && detect.available !== false && detect.enabled && !detect.access && (
+          {isNative && detect.enabled && !detect.access && (
             <Row icon="bell" tint="var(--butter)" label="אישור גישה להתראות" sub="פעם אחת, בהגדרות הטלפון"
               onClick={() => openDetectAccess()} right={chevron} />
           )}

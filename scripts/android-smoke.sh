@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # Installs the APK on the CI emulator, launches it and checks the web app
 # booted to the login screen (WebView text shows up in the UI dump).
-# Usage: android-smoke.sh <apk> [lite]  (lite: the build without the listener)
 set -euo pipefail
 APK=$1
-VARIANT=${2:-full}
 adb install -r "$APK"
 adb shell dumpsys package com.ohavs.payments | grep -E "versionCode|versionName" | head -2
 adb logcat -c
@@ -29,14 +27,6 @@ fi
 # Payment detection: the notification listener is declared correctly and
 # Android binds it once access is granted (what the user does in Settings).
 LISTENER=com.ohavs.payments/com.ohavs.payments.detect.PaymentListenerService
-if [ "$VARIANT" = lite ]; then
-  # Play Protect blocks sideloading an app that declares a listener.
-  if adb shell dumpsys package com.ohavs.payments | grep -q "PaymentListenerService"; then
-    echo "lite build still declares the payment listener"; exit 1
-  fi
-  echo "lite build: no payment listener"
-  exit 0
-fi
 adb shell cmd notification allow_listener "$LISTENER"
 sleep 4
 if adb shell dumpsys notification | grep -q "$LISTENER"; then

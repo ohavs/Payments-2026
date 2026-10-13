@@ -37,13 +37,6 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
-        // Same app without the notification listener (src/lite/AndroidManifest.xml).
-        // Play Protect blocks installing an app that declares one from a browser,
-        // WhatsApp or a file manager, so a new phone installs this first.
-        lite {
-            initWith release
-            matchingFallbacks = ['release']
-        }
     }
 }
 
