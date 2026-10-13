@@ -14,9 +14,25 @@ for i in $(seq 1 20); do
   if grep -q "המשך עם Google" ui.xml; then
     echo "login screen rendered after $((i * 3))s"
     adb exec-out screencap -p > android-smoke.png
-    exit 0
+    booted=1
+    break
   fi
 done
-echo "login screen never appeared"; adb exec-out screencap -p > android-smoke.png || true
-adb logcat -d | grep -iE "chromium|console|capacitor|AndroidRuntime" | tail -120
-exit 1
+if [ -z "${booted:-}" ]; then
+  echo "login screen never appeared"; adb exec-out screencap -p > android-smoke.png || true
+  adb logcat -d | grep -iE "chromium|console|capacitor|AndroidRuntime" | tail -120
+  exit 1
+fi
+
+# Payment detection: the notification listener is declared correctly and
+# Android binds it once access is granted (what the user does in Settings).
+LISTENER=com.ohavs.payments/com.ohavs.payments.detect.PaymentListenerService
+adb shell cmd notification allow_listener "$LISTENER"
+sleep 4
+if adb shell dumpsys notification | grep -q "$LISTENER"; then
+  echo "payment listener registered"
+else
+  echo "payment listener not registered"; adb shell dumpsys notification | grep -iA3 "listener" | head -40
+  exit 1
+fi
+adb shell pidof com.ohavs.payments >/dev/null || { echo "app died after enabling the listener"; adb logcat -d | grep -E "AndroidRuntime" -A20 | tail -60; exit 1; }

@@ -29,7 +29,7 @@ function subtitle(it) {
   return [it.title && it.title !== it.group ? it.group : null, it.note].filter(Boolean).join(' · ');
 }
 
-function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd, onCreateShared }) {
+function ExpensesScreen({ lists, categories, payments, settings, setSettings, onQuickAdd, onCreateShared, suggestionsCard }) {
   const toast = useToast();
   const now = new Date();
   const [view, setView] = React.useState({ y: now.getFullYear(), m: now.getMonth() });
@@ -105,6 +105,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
 
       <SpaceSwitcher lists={lists} onCreateShared={onCreateShared} />
       <PendingInvitesCard lists={lists} />
+      {suggestionsCard}
 
       {/* Month total */}
       <Card className="rise" style={{ marginTop: 16, padding: '16px 18px 18px' }}>

@@ -1,7 +1,9 @@
 // Main app shell — auth gate, theme, tabs, the + button and app-wide sheets.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LoginScreen } from './auth.jsx';
 import { FeedbackProvider, FullScreenLoader, useConfirm, useToast } from './feedback.jsx';
+import { fmtMoney } from './data.jsx';
+import { useExchangeRates } from './fx.jsx';
 import { useAuthUser, useFirebaseSettings, usePayments } from './firebase-init.jsx';
 import { DEFAULT_CATEGORIES, isSharedList, useLists, useSpaceSubs } from './lists.jsx';
 import { notifPermission, registerFcmToken, scanForReminders } from './notifications.jsx';
@@ -11,9 +13,13 @@ import { SubscriptionsScreen } from './screens/subscriptions.jsx';
 import { SettingsScreen } from './screens.jsx';
 import { SharedSpaceSheet } from './spaces.jsx';
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
+import { GmailScanSheet, SuggestionsCard, useDetectedSuggestions } from './suggestions.jsx';
+import { listSuggestions, onDetectEvent, suggestionToItem, takeLaunchAction } from './lib/detect.js';
 import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
-import { haptic, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
+import { haptic, isNative, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
+import { onReminderTap, syncReminders } from './lib/reminders.js';
+import { App as CapApp } from '@capacitor/app';
 import { checkForUpdateQuietly } from './lib/updater.js';
 
 // 'system' follows the phone; 'light' / 'dark' are explicit choices.
@@ -82,6 +88,10 @@ function AppInner() {
   const [update, setUpdate] = useState(null);       // latest release info, when newer
   const [updateOpen, setUpdateOpen] = useState(false);
   const [sharedOpen, setSharedOpen] = useState(false);
+  const [quickPrefill, setQuickPrefill] = useState(null);
+  const [gmailOpen, setGmailOpen] = useState(false);
+  const fx = useExchangeRates();
+  const detected = useDetectedSuggestions(isNative && !!user);
 
   useTheme(user ? settings.theme : 'system');
 
@@ -99,16 +109,26 @@ function AppInner() {
     checkForUpdateQuietly().then((r) => { if (r?.available) setUpdate(r); });
   }, [user?.uid]);
 
-  // On payments/settings change, scan for upcoming reminders
+  // Reminders. Android: schedule the coming weeks on the phone, again on every
+  // change and every return to the app. Web: scan on load and register for push.
+  const reminderKey = `${(settings.notifTimings || []).join(',')}|${settings.notifTime}|${settings.notif}|` +
+    allSubs.map((p) => `${p.id}:${p.nextDate}:${p.cycle}:${p.price}`).join(',');
   useEffect(() => {
     if (!user || paymentsLoading || settingsLoading) return;
-    scanForReminders(allSubs, settings);
-  }, [user?.uid, allSubs.length, settings?.notif, settingsLoading, paymentsLoading]);
+    if (isNative) syncReminders(allSubs, settings);
+    else scanForReminders(allSubs, settings);
+  }, [user?.uid, reminderKey, settingsLoading, paymentsLoading]);
+  useEffect(() => {
+    if (!isNative || !user || paymentsLoading || settingsLoading) return;
+    const h = CapApp.addListener('resume', () => syncReminders(allSubs, settings));
+    return () => { h.then((x) => x.remove()); };
+  }, [user?.uid, reminderKey, settingsLoading, paymentsLoading]);
+  useEffect(() => onReminderTap((extra) => { if (extra.tab) setTab(extra.tab); }), []);
 
   // Re-register FCM token on app load if notification permission is already granted
   // (handles new device, token expiry, etc.)
   useEffect(() => {
-    if (!user || settingsLoading) return;
+    if (isNative || !user || settingsLoading) return;
     if (notifPermission() === 'granted') registerFcmToken(user.uid);
   }, [user?.uid, settingsLoading]);
 
@@ -141,7 +161,39 @@ function AppInner() {
       haptic('success');
     } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
-  const openQuickAdd = (category = null) => { haptic('press'); setQuickCategory(category); setQuickOpen(true); };
+  const openQuickAdd = (category = null) => { haptic('press'); setQuickPrefill(null); setQuickCategory(category); setQuickOpen(true); };
+
+  // Detected payments → expenses in the active space.
+  const toItem = (s) => suggestionToItem(s, {
+    categories, items: lists.items, currency: spaceSettings.defaultCurrency || '₪', rates: fx?.rates,
+  });
+  const addSuggestions = async (list) => {
+    if (!list.length || !lists.activeListId) return;
+    try {
+      const added = [];
+      for (const s of list) { const item = toItem(s); await lists.ops.addItem(lists.activeListId, item); added.push(item); }
+      await detected.remove(list.map((s) => s.id));
+      haptic('success');
+      toast(added.length === 1 ? `נוספה הוצאה · ${fmtMoney(added[0].amount)} · ${added[0].title}` : `נוספו ${added.length} הוצאות`, { type: 'success' });
+    } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
+  };
+  const editSuggestion = (s) => {
+    haptic('tap'); setQuickCategory(null); setQuickPrefill({ ...toItem(s), suggestionId: s.id }); setQuickOpen(true);
+  };
+  // "הוסף" / tap on a detection notification opened the app.
+  const detectActionRef = useRef(null);
+  detectActionRef.current = async (a) => {
+    if (!a) return;
+    setTab('expenses');
+    if (a.action !== 'add') { detected.refresh(); return; }
+    const s = (await listSuggestions()).find((x) => x.id === a.id);
+    if (s) addSuggestions([s]);
+  };
+  useEffect(() => {
+    if (!isNative || !user || !lists.activeListId) return;
+    takeLaunchAction().then((a) => detectActionRef.current(a)).catch(() => {});
+  }, [user?.uid, !!lists.activeListId]);
+  useEffect(() => onDetectEvent('action', (a) => detectActionRef.current(a)), []);
   const handleSignOut = async () => {
     const ok = await confirm({
       title: 'התנתקות',
@@ -180,6 +232,11 @@ function AppInner() {
               setSettings={setSpaceSettings}
               onQuickAdd={openQuickAdd}
               onCreateShared={() => setSharedOpen(true)}
+              suggestionsCard={(
+                <SuggestionsCard suggestions={detected.suggestions} categories={categories} items={lists.items}
+                  onAdd={addSuggestions} onDismiss={(l) => detected.remove(l.map((s) => s.id))} onEdit={editSuggestion}
+                  style={{ marginTop: 14 }} />
+              )}
             />
           )}
           {tab === 'subs' && (
@@ -203,6 +260,7 @@ function AppInner() {
               payments={payments}
               onSignOut={handleSignOut}
               onOpenUpdates={() => setUpdateOpen(true)}
+              onOpenGmail={() => setGmailOpen(true)}
             />
           )}
         </main>
@@ -225,10 +283,11 @@ function AppInner() {
           onClose={() => setQuickOpen(false)}
           categories={categories}
           defaultCategory={quickCategory}
+          prefill={quickPrefill}
           recentTitles={recentTitles}
           canSave={!!lists.activeListId}
           list={activeShared ? lists.activeList : null}
-          onAdd={addExpense}
+          onAdd={(item) => { addExpense(item); if (quickPrefill?.suggestionId) detected.remove([quickPrefill.suggestionId]); }}
           onAddSubscription={() => { setQuickOpen(false); setTimeout(() => setAddSubOpen(true), 260); }}
         />
         <DetailSheet
@@ -252,6 +311,11 @@ function AppInner() {
         />
         <UpdateSheet open={updateOpen} onClose={() => setUpdateOpen(false)} initial={update} />
         <SharedSpaceSheet open={sharedOpen} onClose={() => setSharedOpen(false)} lists={lists} />
+        <GmailScanSheet open={gmailOpen} onClose={() => setGmailOpen(false)}
+          categories={categories} items={lists.items} subs={allSubs}
+          currency={spaceSettings.defaultCurrency || '₪'} rates={fx?.rates}
+          onAddExpense={(item) => lists.ops.addItem(lists.activeListId, item).then(() => toast(`נוספה הוצאה · ${fmtMoney(item.amount)} · ${item.title}`, { type: 'success' })).catch(() => toast('שגיאה בהוספה', { type: 'error' }))}
+          onAddSubscription={addPayment} />
       </div>
     </div>
   );

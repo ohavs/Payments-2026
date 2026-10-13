@@ -1,0 +1,40 @@
+name: Google Cloud setup
+
+# Idempotent: enables the Google APIs the app calls from the client (Gmail,
+# for the receipts scan) and reports what the deploy service account can do.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/gcp-setup.yml
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: schedual-fdde7
+    steps:
+      - name: Authenticate
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json"
+          gcloud config set project "$PROJECT"
+          node -e 'console.log("service account:", require(process.argv[1]).client_email)' "$RUNNER_TEMP/sa.json"
+
+      - name: Enable Gmail API
+        run: |
+          set +e
+          gcloud services enable gmail.googleapis.com --project "$PROJECT"
+          echo "enable exit code: $?"
+          gcloud services list --enabled --project "$PROJECT" --format='value(config.name)' | grep -E "gmail|cloudfunctions|cloudbuild|artifactregistry|cloudscheduler|run.googleapis" || true
+
+      - name: Report (billing, roles)
+        run: |
+          set +e
+          gcloud billing projects describe "$PROJECT" --format='value(billingEnabled)' 2>&1 | sed 's/^/billing enabled: /'
+          EMAIL=$(node -e 'console.log(require(process.argv[1]).client_email)' "$RUNNER_TEMP/sa.json")
+          gcloud projects get-iam-policy "$PROJECT" --flatten='bindings[].members' \
+            --filter="bindings.members:serviceAccount:$EMAIL" --format='value(bindings.role)' 2>&1 | sed 's/^/role: /'
+          rm -f "$RUNNER_TEMP/sa.json"

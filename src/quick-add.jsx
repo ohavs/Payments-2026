@@ -21,7 +21,8 @@ function shortDate(iso) {
   return `${d}.${m}${y !== new Date().getFullYear() ? `.${String(y).slice(2)}` : ''}`;
 }
 
-function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitles = [], canSave, list, onAdd, onAddSubscription }) {
+// `prefill` (a detected payment) opens the sheet filled in, ready to adjust.
+function QuickAddSheet({ open, onClose, categories, defaultCategory, prefill, recentTitles = [], canSave, list, onAdd, onAddSubscription }) {
   const toast = useToast();
   const [amount, setAmount] = React.useState('');
   const [bump, setBump] = React.useState(0);
@@ -36,6 +37,12 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitle
     setAmount(''); setBump(0); setTitle(''); setDate(todayISO()); setCalendarOpen(false);
     setPaidBy(fbAuth.currentUser?.uid || null);
     setCategory(defaultCategory && categories.includes(defaultCategory) ? defaultCategory : categories[0]);
+    if (prefill) {
+      setAmount(String(prefill.amount || ''));
+      setTitle(prefill.title || '');
+      if (prefill.date) setDate(prefill.date);
+      if (categories.includes(prefill.group)) setCategory(prefill.group);
+    }
   }, [open]);
 
   const press = (k) => { setAmount((a) => applyKey(a, k)); setBump((b) => b + 1); };
@@ -44,7 +51,8 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, recentTitle
 
   const save = () => {
     if (!ready) return;
-    const item = { title: title.trim() || category, amount: value, group: category, note: '', date };
+    const item = { title: title.trim() || category, amount: value, group: category, note: prefill?.note || '', date };
+    if (prefill?.source) item.source = prefill.source;
     if (list && paidBy) item.paidBy = paidBy;
     onAdd(item);
     toast(`נוספה הוצאה · ${fmtMoney(value)} · ${category}`, { type: 'success' });

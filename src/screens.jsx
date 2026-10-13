@@ -9,6 +9,9 @@ import { Spinner, useToast } from './feedback.jsx';
 import { ManageExpensesSheet } from './lists.jsx';
 import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNotification } from './notifications.jsx';
 import { ListCard, SectionHeader } from './payment-card.jsx';
+import { ensureNativeNotifPermission, nativeNotifPermission, sendNativeTestNotification } from './lib/reminders.js';
+import { detectStatus, openDetectAccess, setDetectEnabled } from './lib/detect.js';
+import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
@@ -298,12 +301,13 @@ function CalendarScreen({ payments, onOpenPayment, onOpenAdd }) {
 }
 
 // ---------- SETTINGS ----------
-function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates }) {
+function SettingsScreen({ user, settings, setSettings, lists, categories, payments, onSignOut, onOpenUpdates, onOpenGmail }) {
   const [version, setVersion] = useState(null);
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
   const toast = useToast();
-  const [notifPerm, setNotifPerm] = useState(() => notifPermission());
+  const [notifPerm, setNotifPerm] = useState(() => (isNative ? 'prompt' : notifPermission()));
+  useEffect(() => { if (isNative) nativeNotifPermission().then(setNotifPerm).catch(() => {}); }, []);
   const [testBusy, setTestBusy] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -317,8 +321,44 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
     { id: 'same',  label: 'ביום עצמו' },
   ];
 
+  // Turning reminders on asks for the permission right away (Android 13+).
+  const setNotif = async (on) => {
+    update({ notif: on });
+    if (on && isNative) setNotifPerm(await ensureNativeNotifPermission());
+  };
+
+  // Payment detection (Android): needs notification access, granted once in
+  // the phone's settings. Re-checked whenever the user comes back to the app.
+  const [detect, setDetect] = useState({ access: false, enabled: false });
+  useEffect(() => {
+    if (!isNative) return undefined;
+    const check = () => detectStatus().then(setDetect).catch(() => {});
+    check();
+    const h = CapApp.addListener('resume', check);
+    return () => { h.then((x) => x.remove()); };
+  }, []);
+  const toggleDetect = async (on) => {
+    setDetect(await setDetectEnabled(on));
+    if (!on) return;
+    if ((await ensureNativeNotifPermission()) !== 'granted') toast('בלי הרשאת התראות ההצעות יופיעו רק באפליקציה', { type: 'info' });
+    const st = await detectStatus();
+    if (!st.access) {
+      toast('אשר ל״תשלומים״ גישה להתראות וחזור לאפליקציה', { type: 'info' });
+      setTimeout(() => openDetectAccess(), 700);
+    }
+  };
+  const detectSub = !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
+    : detect.access ? 'פעיל · תשלום חדש יופיע כהצעה' : 'צריך לאשר גישה להתראות';
+
   const sendTestNotification = async () => {
     setTestBusy(true);
+    if (isNative) {
+      const perm = await ensureNativeNotifPermission();
+      setNotifPerm(perm);
+      if (perm === 'granted') { await sendNativeTestNotification(); toast('נשלחה התראת בדיקה', { type: 'success' }); }
+      else toast('יש לאשר התראות בהגדרות הטלפון', { type: 'error' });
+      setTestBusy(false); return;
+    }
     const perm = await ensureNotifPermission();
     setNotifPerm(perm);
     if (perm === 'unsupported') {
@@ -404,7 +444,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
 
       <SettingsGroup title="התראות">
         <Row icon="bell" tint="var(--butter)" label="תזכורות לתשלומים" sub="לפני כל חיוב של מנוי"
-          right={<Toggle checked={settings.notif} onChange={v => update({ notif: v })} />} />
+          right={<Toggle checked={settings.notif} onChange={setNotif} />} />
         {settings.notif && (
           <div style={{ padding: '4px 16px 14px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -444,6 +484,23 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
           </button>
         </div>
       </SettingsGroup>
+
+      {(isNative || !isAnon) && (
+        <SettingsGroup title="זיהוי תשלומים אוטומטי">
+          {isNative && (
+            <Row icon="card" tint="var(--mint)" label="תשלומים מהטלפון" sub={detectSub}
+              right={<Toggle checked={detect.enabled} onChange={toggleDetect} />} />
+          )}
+          {isNative && detect.enabled && !detect.access && (
+            <Row icon="bell" tint="var(--butter)" label="אישור גישה להתראות" sub="פעם אחת, בהגדרות הטלפון"
+              onClick={() => openDetectAccess()} right={chevron} />
+          )}
+          {!isAnon && (
+            <Row icon="download" tint="var(--sky)" label="קבלות מ־Gmail" sub="מנויים וקניות מהמייל"
+              onClick={onOpenGmail} right={chevron} />
+          )}
+        </SettingsGroup>
+      )}
 
       <SettingsGroup title="מראה">
         <div style={{ padding: 12 }}>
