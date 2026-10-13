@@ -50,9 +50,9 @@
 - [x] טופס מנוי משותף (`SubscriptionForm` ב־`sheets.jsx`) להוספה ולפרטים. "חיובים אחרונים" מחושבים מהלו"ז (היה מדומה)
 - [x] גיליון סגור מוסתר (`visibility`) והמעטפת `overflow: clip`, כדי ש־focus/scroll לא יזיזו את המסך
 - [ ] Gmail חסום (Error 403 access_denied): מסך ההסכמה של הפרויקט (שם "booking") במצב Testing. המשתמש צריך להוסיף את עצמו כ־Test user
-- [ ] ליטוש שנותר: בונה שירות מותאם אישית וניהול מרחבים בסגנון הישן
+- [x] בונה שירות מותאם אישית בסגנון החדש. ניהול מרחבים כבר קרוב לסגנון החדש
 - [ ] תזכורות למנויים משותפים בצד השרת: `functions/` קורא רק `users/{uid}/payments` (וממילא לא נפרס)
-- [ ] ייצוא CSV (הוסר מהממשק עד שימומש)
+- [x] ייצוא CSV: הגדרות ← "ייצוא הוצאות" (`src/lib/export.js`). אנדרואיד: Filesystem + Share. שם קובץ ASCII (שם עברי נזרק בדפדפן)
 - [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
 - [x] שלב 3 (צד שרת): `functions/index.js` נפרס מה־CI (`deploy.yml`, אחרון). Blaze פעיל
   - `onSpaceItemCreated` (europe-west1, ליד Firestore ב־eur3): push לשאר חברי המרחב + התראת תקציב 80%/100% פעם אחת לחודש (`lists/{id}.budgetAlerts.mYYYYMM`)

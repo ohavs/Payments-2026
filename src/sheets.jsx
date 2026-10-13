@@ -6,25 +6,18 @@ import { Spinner, useConfirm, useToast } from './feedback.jsx';
 import { occurrencesBetween } from './lib/recurrence.js';
 import { Segmented } from './ui/kit.jsx';
 
-// ---------- Edit field row ----------
+// ---------- Text field: label + rounded input ----------
 function EditField({ label, value, onChange, type = 'text', placeholder, suffix }) {
   return (
-    <label style={{ display: 'block', padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 6 }}>
-        {label}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input
-          type={type}
-          value={value}
+    <label style={{ display: 'block' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-dim)', margin: '20px 2px 9px' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 50, borderRadius: 16, background: 'var(--surface-2)', padding: '0 16px' }}>
+        <input type={type} value={value ?? ''} placeholder={placeholder}
           onChange={(e) => onChange(type === 'number' ? Number(e.target.value) : e.target.value)}
-          placeholder={placeholder}
           style={{
-            flex: 1, background: 'transparent', border: 'none', outline: 'none',
-            color: 'var(--ink)', fontSize: 17, fontWeight: 600, fontFamily: 'inherit',
-            padding: 0, fontVariantNumeric: 'tabular-nums',
-          }}
-        />
+            flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', padding: 0,
+            color: 'var(--ink)', fontSize: 15.5, fontWeight: 600, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums',
+          }} />
         {suffix && <span style={{ color: 'var(--ink-dim)', fontSize: 15, fontWeight: 600 }}>{suffix}</span>}
       </div>
     </label>
@@ -394,77 +387,50 @@ function CustomServiceBuilder({ initial, onCancel, onSave, title = 'שירות �
       </div>
 
       {/* Form */}
-      <div style={{ background: 'var(--surface-2)', borderRadius: 20, margin: '0 22px' }}>
+      <div style={{ padding: '0 22px' }}>
         <EditField label="שם השירות" value={name} onChange={setName} placeholder="לדוגמה: ביטוח חיות מחמד" />
 
-        {/* Image upload */}
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>תמונה / לוגו</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: '50%',
-              background: image ? `url(${image}) center/cover` : bg,
-              color: fg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 800, fontSize: 22, flexShrink: 0,
-              border: '1px solid var(--divider)',
-            }}>
-              {!image && (glyph || (name[0] || '?'))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-              <button onClick={() => fileRef.current?.click()} style={{
-                padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: 'var(--surface-3)', color: 'var(--ink)', fontFamily: 'inherit',
-                fontWeight: 600, fontSize: 13,
-              }}>{image ? 'החלף תמונה' : 'העלה תמונה'}</button>
-              {image && (
-                <button onClick={() => setImage(null)} style={{
-                  padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                  background: 'transparent', color: 'var(--ink-dim)', fontFamily: 'inherit',
-                  fontWeight: 600, fontSize: 12,
-                }}>הסר תמונה</button>
-              )}
-            </div>
-          </div>
+        <FieldLabel>תמונה או לוגו</FieldLabel>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+          <button onClick={() => fileRef.current?.click()} className="press" style={{
+            height: 44, padding: '0 16px', borderRadius: 14, border: 'none', cursor: 'pointer',
+            background: 'var(--surface-2)', color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
+          }}>{image ? 'החלף תמונה' : 'העלה תמונה'}</button>
+          {image && (
+            <button onClick={() => setImage(null)} style={{
+              height: 44, padding: '0 10px', border: 'none', cursor: 'pointer', background: 'transparent',
+              color: 'var(--ink-dim)', fontFamily: 'inherit', fontWeight: 700, fontSize: 13.5,
+            }}>הסר</button>
+          )}
         </div>
 
-        {/* Glyph (if no image) */}
         {!image && (
-          <EditField label="אות / סמל (אם אין תמונה)" value={glyph} onChange={setGlyph} placeholder="א, N, ⚡, 🚗..." />
+          <EditField label="אות או סמל (כשאין תמונה)" value={glyph} onChange={setGlyph} placeholder="א, N, ⚡, 🚗..." />
         )}
 
-        {/* Color swatches */}
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--divider)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>צבע רקע</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {SERVICE_PALETTE.map(c => (
-              <button key={c} onClick={() => setBg(c)} aria-label={c} style={{
-                width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
-                background: c, border: 'none',
-                outline: bg === c ? '2px solid var(--ink)' : '2px solid transparent',
-                outlineOffset: 2,
-              }} />
-            ))}
-            <label style={{
-              width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
-              background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)',
-              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <input type="color" value={bg} onChange={e => setBg(e.target.value)}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-            </label>
-          </div>
+        <FieldLabel>צבע</FieldLabel>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {SERVICE_PALETTE.map(c => (
+            <button key={c} onClick={() => setBg(c)} aria-label={c} style={{
+              width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', background: c,
+              border: '2px solid var(--stroke)', outline: bg === c ? '3px solid var(--ink)' : '3px solid transparent', outlineOffset: 2,
+            }} />
+          ))}
+          <label style={{
+            width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', border: '2px solid var(--stroke)',
+            background: 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)', position: 'relative', overflow: 'hidden',
+          }}>
+            <input type="color" value={bg} onChange={e => setBg(e.target.value)} aria-label="צבע אחר"
+              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
+          </label>
         </div>
 
-        {/* Category */}
-        <div style={{ padding: '14px 18px' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', marginBottom: 10 }}>קטגוריה</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {CATEGORIES.map(c => (
-              <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>{c.name}</Chip>
-            ))}
-          </div>
+        <FieldLabel>קטגוריה</FieldLabel>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {CATEGORIES.map(c => (
+            <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>{c.name}</Chip>
+          ))}
         </div>
       </div>
 

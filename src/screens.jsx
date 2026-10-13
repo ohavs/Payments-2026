@@ -11,6 +11,7 @@ import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNoti
 import { ListCard, SectionHeader } from './payment-card.jsx';
 import { ensureNativeNotifPermission, nativeNotifPermission, sendNativeTestNotification } from './lib/reminders.js';
 import { detectStatus, openDetectAccess, setDetectEnabled } from './lib/detect.js';
+import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
 
@@ -350,6 +351,18 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   const detectSub = !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
     : detect.access ? 'פעיל · תשלום חדש יופיע כהצעה' : 'צריך לאשר גישה להתראות';
 
+  const exportExpenses = async () => {
+    const list = lists.activeList;
+    if (!lists.items.length) { toast('אין עדיין הוצאות לייצא', { type: 'info' }); return; }
+    const shared = (list?.members || []).length > 1;
+    const csv = expensesToCSV(lists.items, shared ? {
+      payerName: (id) => (id === 'joint' ? 'משותף' : list.memberInfo?.[id]?.name || ''),
+    } : {});
+    // ASCII file name: some browsers drop a Hebrew one and save "download".
+    try { await shareCSV(csv, `${shared ? 'shared-expenses' : 'expenses'}-${new Date().toISOString().slice(0, 10)}.csv`); }
+    catch (e) { if (!/cancel/i.test(e?.message || '')) toast('הייצוא נכשל', { type: 'error' }); }
+  };
+
   const sendTestNotification = async () => {
     setTestBusy(true);
     if (isNative) {
@@ -432,6 +445,8 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
         <Row icon="user" tint="var(--lavender)" label="מרחבים ושיתוף"
           sub={`${lists.activeList?.name || 'ההוצאות שלי'}${members > 1 ? ` · ${members} משתתפים` : ''}`}
           onClick={() => setManageOpen(true)} right={chevron} />
+        <Row icon="download" tint="var(--sky)" label="ייצוא הוצאות" sub={`קובץ CSV של ${lists.activeList?.name || 'ההוצאות שלי'}`}
+          onClick={exportExpenses} right={chevron} />
         <Row icon="shekel" tint="var(--butter)" label="מטבע"
           right={
             <div style={{ display: 'flex', gap: 4 }}>
