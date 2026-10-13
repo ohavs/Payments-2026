@@ -60,7 +60,7 @@
   - `paymentReminders`: רק למכשירי ווב (`localReminders: false`), כולל מנויים משותפים
   - מכשירים ב־`users/{uid}/devices/{deviceId}`. אנדרואיד: `@capacitor-firebase/messaging`, ערוצים shared-activity / budget / monthly-summary
   - לוגיקה טהורה ב־`functions/lib.js` עם בדיקות. הטריגר והסיכום נבדקו מול Firestore emulator (FCM מדומה)
-  - **חסום:** פריסת Functions נכשלת ב־CI. חשבון השירות (Editor) לא יכול להוסיף הרשאות IAM לסוכני השירות (eventarc.eventReceiver, run.invoker, pubsub tokenCreator). המשתמש צריך להריץ פעם אחת 3 פקודות gcloud ב־Cloud Shell. עד אז שלב "Deploy Cloud Functions" אדום (האתר עצמו נפרס)
+  - הרשאות סוכני השירות לפריסת Functions הוגדרו ידנית (pubsub tokenCreator, compute run.invoker + eventarc.eventReceiver). חשבון הפריסה (Editor) לא יכול לשנות IAM בעצמו
 - [ ] שלב 4: להכניס את תרחיש ה־e2e מול emulators ל־CI (היום רץ רק בסשן)
 
 ## החלטות
