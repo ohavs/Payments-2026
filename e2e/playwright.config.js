@@ -20,7 +20,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npx vite preview --outDir dist-emu --port 5002 --strictPort',
+    // --host: on the CI runner localhost is IPv6 only.
+    command: 'npx vite preview --outDir dist-emu --host 127.0.0.1 --port 5002 --strictPort',
     cwd: '..',
     url: 'http://127.0.0.1:5002',
     reuseExistingServer: !process.env.CI,
