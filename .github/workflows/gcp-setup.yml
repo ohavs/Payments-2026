@@ -30,6 +30,14 @@ jobs:
           echo "enable exit code: $?"
           gcloud services list --enabled --project "$PROJECT" --format='value(config.name)' | grep -E "gmail|cloudfunctions|cloudbuild|artifactregistry|cloudscheduler|run.googleapis" || true
 
+      - name: Deployed Cloud Functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          set +e
+          gcloud functions list --project "$PROJECT" --format='table(name,state,environment)' 2>&1 | head -20
+          gcloud run services list --project "$PROJECT" --format='value(metadata.name)' 2>&1 | head -20
+
       - name: Report (billing, roles)
         run: |
           set +e
