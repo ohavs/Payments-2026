@@ -18,7 +18,7 @@ import { listSuggestions, onDetectEvent, suggestionToItem, takeLaunchAction } fr
 import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
 import { haptic, isNative, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
-import { onReminderTap, syncReminders } from './lib/reminders.js';
+import { ensureNativeNotifPermission, onReminderTap, syncReminders } from './lib/reminders.js';
 import { App as CapApp } from '@capacitor/app';
 import { checkForUpdateQuietly } from './lib/updater.js';
 
@@ -115,8 +115,14 @@ function AppInner() {
     allSubs.map((p) => `${p.id}:${p.nextDate}:${p.cycle}:${p.price}`).join(',');
   useEffect(() => {
     if (!user || paymentsLoading || settingsLoading) return;
-    if (isNative) syncReminders(allSubs, settings);
-    else scanForReminders(allSubs, settings);
+    if (isNative) {
+      // Reminders were on before the app could post notifications itself
+      // (Android 13+): ask once, then schedule.
+      const ask = settings.notif && !localStorage.getItem('notif-asked')
+        ? (localStorage.setItem('notif-asked', '1'), ensureNativeNotifPermission().catch(() => {}))
+        : Promise.resolve();
+      ask.then(() => syncReminders(allSubs, settings));
+    } else scanForReminders(allSubs, settings);
   }, [user?.uid, reminderKey, settingsLoading, paymentsLoading]);
   useEffect(() => {
     if (!isNative || !user || paymentsLoading || settingsLoading) return;
