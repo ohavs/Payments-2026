@@ -5,7 +5,7 @@
 set -euo pipefail
 PKG=com.ohavs.payments
 adb root >/dev/null; sleep 3; adb wait-for-device
-adb shell cmd appwidget grantbind --package $PKG --user 0
+adb shell appwidget grantbind --package $PKG --user 0
 
 CONFIG='{"uid":"ci","refreshToken":"ci-not-a-token","apiKey":"ci","projectId":"schedual-fdde7","currency":"₪","activeSpaceId":"p1","spaces":[{"id":"p1","name":"ההוצאות שלי","shared":false,"groups":["קניות","ביטוחים","אוכל בחוץ","שונות"]},{"id":"s1","name":"הבית שלנו","shared":true,"groups":["קניות","בית","חשבונות","אוכל בחוץ","רכב","ספורט"]}]}'
 B64=$(printf '%s' "$CONFIG" | base64 -w0)
