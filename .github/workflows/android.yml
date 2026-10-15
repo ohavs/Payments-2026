@@ -31,10 +31,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Gradle's downloads are cached between runs, so a Maven Central hiccup
+      # (it once failed to serve a Kotlin jar) doesn't break the build.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle
 
       - name: Build web and sync into Android
         run: |
