@@ -7,7 +7,14 @@
 set -euo pipefail
 PKG=com.ohavs.payments
 SHOT=${1:-widget-14}
-adb root >/dev/null; sleep 3; adb wait-for-device
+# Newer images drop the connection while adbd restarts as root ("unable to
+# connect for root: closed"), so check the result instead of the exit code.
+for i in 1 2 3; do
+  adb root >/dev/null 2>&1 || true
+  sleep 3; adb wait-for-device
+  [ "$(adb shell id -u | tr -d '\r')" = 0 ] && break
+done
+[ "$(adb shell id -u | tr -d '\r')" = 0 ] || { echo "no adb root"; exit 1; }
 
 launcher() { adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $PKG | tail -1 | tr -d '\r'; }
 ask_icon() {
