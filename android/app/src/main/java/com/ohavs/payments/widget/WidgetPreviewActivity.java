@@ -65,6 +65,8 @@ public class WidgetPreviewActivity extends Activity {
             view.updateAppWidgetSize(new Bundle(), Collections.singletonList(new SizeF(wd, hd)));
         }
         setContentView(root);
+        view.post(() -> android.util.Log.i("WidgetPreview", "host view " + view.getWidth() / getResources().getDisplayMetrics().density
+            + "x" + view.getHeight() / getResources().getDisplayMetrics().density + " dp, padding " + view.getPaddingLeft() + "," + view.getPaddingTop()));
         QuickAddWidget.render(this, m, id);
     }
 

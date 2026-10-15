@@ -141,10 +141,12 @@ function useLists(uid, user) {
   React.useEffect(() => {
     if (!uid || !serverLoaded || cleanedRef.current) return;
     cleanedRef.current = true;
-    const created = (l) => l.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER;
+    // Oldest first, to the nanosecond (both can be created in the same second).
+    const sec = (l) => l.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER;
+    const nano = (l) => l.createdAt?.nanoseconds ?? 0;
     const mine = lists
       .filter(l => l.name === 'ההוצאות שלי' && l.ownerUid === uid && !isSharedList(l))
-      .sort((a, b) => created(a) - created(b));
+      .sort((a, b) => (sec(a) - sec(b)) || (nano(a) - nano(b)));
     if (mine.length < 2) return;
     const [keep, ...dupes] = mine;
     (async () => {

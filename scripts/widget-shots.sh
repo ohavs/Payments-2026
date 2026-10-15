@@ -35,7 +35,8 @@ tap() {
 
 open_widget
 dump
-grep -q 'text="קניות"' w.xml || { echo "categories not listed"; cat w.xml | head -c 3000; exit 1; }
+adb logcat -d -s WidgetPreview | tail -3
+grep -q 'text="קניות"' w.xml || { echo "categories not listed"; grep -o 'text="[^"]*"\|bounds="[^"]*"' w.xml | head -40; adb logcat -d | grep -iE "RemoteViews|AppWidget|WidgetPreview" | tail -30; exit 1; }
 shot widget-1-empty
 tap =4; tap =5; tap =.; tap =9
 tap "קניות"

@@ -7,6 +7,7 @@ test('duplicate personal spaces are merged', async ({ page, context }) => {
   await offline(context);
   const errors = trackErrors(page);
   await signInGuest(page);
+  await page.waitForTimeout(1500); // the duplicate is clearly the newer one
   await page.evaluate(async () => {
     const fb = window.firebase;
     const db = fb.firestore();
