@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark tokens from src/styles.css; translucent pastels flattened over --surface-1. -->
+<!-- Dark tokens from src/styles.css; translucent pastels flattened over surface-1. -->
 <resources>
     <color name="w_surface">#1A1A1E</color>
     <color name="w_surface_2">#25252A</color>
