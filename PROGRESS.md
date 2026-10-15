@@ -69,6 +69,13 @@
 - [x] Play Protect חוסם התקנה ראשונה מוואטסאפ/דפדפן (בגלל קריאת ההתראות). החלטת המשתמש: גרסה אחת לכולם, מכבים Play Protect לרגע בהתקנה הראשונה. גרסת ה־lite בוטלה (v2.0.42). עדכונים מתוך האפליקציה לא נחסמים
 - [x] Gmail ברקע (אנדרואיד): `detect/GmailReceiptJob` (JobScheduler, כל שעה, persisted) + `GmailReceiptScanner` (טוקן שקט, השאילתה מ־`receiptQuery(3)`, רק מיילים שהגיעו אחרי ההפעלה, כל הודעה פעם אחת) → `SuggestionStore` + התראה "קבלה במייל · להוסיף?". המפענח `GmailReceiptParser` (פורט של `gmail.js`, אותם מקרים ב־JUnit). הגדרות ← "קבלה חדשה במייל". מסך ההסכמה פורסם (Production) ע"י המשתמש, אז ההרשאה לא פגה כל 7 ימים; עד אימות Google יופיע מסך "האפליקציה לא אומתה" בהרשאה הראשונה
   - טרם נבדק במכשיר אמיתי
+- [x] ווידג׳ט מסך בית "הוספת הוצאה" (`android/.../widget/`): מקלדת, רשימת קטגוריות של המרחב (מדבקות כ־vector, אותו מיפוי כמו `icons.jsx`), "+ קטגוריה חדשה" (גיליון קטן מעל מסך הבית, `NewCategoryActivity`; ווידג׳ט לא יכול להכיל שדה טקסט), מעבר בין מרחבים, שמירה
+  - שומר ישירות ל־Firestore ב־REST כמשתמש (`FirestoreRest`): האפליקציה מסנכרנת refresh token, מרחבים וקטגוריות (`src/lib/widget.js` → `WidgetBridgePlugin`). אותם מסמכים ו־rules כמו האפליקציה; `source: 'widget'`. נבדק מול emulators (JVM)
+  - בלי חיבור: נשמר בתור ונשלח בשמירה הבאה או כשהאפליקציה נפתחת
+  - טוקנים ועיצוב: `values(-night)/widget_colors.xml` מ־`styles.css`, Rubik סטטי (600/800, מוקטן לעברית+לטינית), RTL קבוע
+  - הגדרות ← "ווידג׳ט למסך הבית" (requestPinAppWidget)
+  - CI: `scripts/widget-shots.sh` מארח את הווידג׳ט באמולטור (`WidgetPreviewActivity`, adb root + `appwidget grantbind`), לוחץ ומצלם. הצילומים בענף `ci-shots`
+  - טרם נבדק בטלפון אמיתי: שמירה מול Firebase האמיתי (מפתח ה־API עם Referer/X-Android headers)
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 
