@@ -46,6 +46,10 @@ sleep 6
 adb shell input keyevent KEYCODE_HOME
 sleep 4
 expect .IconViolet "home"
+# The system applies the switch (launcher icons, and closing the task opened
+# through the old icon) with a batched broadcast, up to ~10s later. A phone
+# shows the new icon only then, so tap it only then.
+sleep 12
 # The new icon opens the app.
 adb shell am start -W -n $PKG/.IconViolet | grep -q "Status: ok" || { echo "the violet icon does not open the app"; exit 1; }
 sleep 4
