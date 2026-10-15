@@ -83,6 +83,11 @@
   - פורסם ב־v2.0.63 ואילך
 - [x] אייקון: רקע ירוק מלא + ₪ ב־Rubik ExtraBold, שכבת monochrome (`scripts/make_icons.py`)
 - [x] הגדרות: קבוצות מתקפלות, נזכר לכל קבוצה (`settings.open.<כותרת>` ב־localStorage)
+- [x] ווידג׳ט, סבב 3: בגודל רחב ונמוך המקשים נמרחו. עכשיו כל גודל שהמשגר מדווח (`OPTION_APPWIDGET_SIZES`, או min/max) מקבל פריסה משלו ורוחב מקלדת מחושב (`layoutFor`/`keypadWidth`, בדיקות ב־`WidgetLogicTest`). פריסה רביעית `widget_quick_add_wide.xml`: מקלדת מימין, סכום/קטגוריה/שמירה משמאל. בגדול המקלדת עברה לימין. ארבעה גדלי fallback למשגר שלא מדווח
+- [x] ערכות צבע (הגדרות ← מראה): קלאסי · לילך · שקיעה · ים · דבש. `settings.palette` (מסונכרן) + `localStorage` לפתיחה מהירה, `[data-palette]` ב־`styles.css` (accent + טקסטורה ב־`.app-bg::before`), favicon, צבע התזכורות, הווידג׳ט (`WidgetTheme`, drawables לכל ערכה)
+  - סמלים: מקור אחד `src/lib/app-icons.js` (SVG), `node scripts/make_icons.mjs` מייצר mipmaps לכל ערכה + אייקוני ווב (במקום `make_icons.py`)
+  - סמל המשגר: activity-alias לכל ערכה. הפעילות האמיתית היא `AppActivity`; ה־alias `.MainActivity` (ירוק, ברירת מחדל) שומר על אייקונים קיימים במסך הבית. ההחלפה (`AppIcons`) רק ב־`onUserLeaveHint`/יציאה, כי המערכת סוגרת את המסך שנפתח דרך alias שכובה. הסמל מתחלף רק במכשיר שבו בחרו
+  - טרם נבדק בטלפון אמיתי: החלפת הסמל (במשגרים רבים האייקון נעלם ממסך הבית וצריך לגרור מחדש)
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 
