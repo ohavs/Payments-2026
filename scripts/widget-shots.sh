@@ -68,6 +68,7 @@ open_widget 260 300
 dump; grep -q 'content-desc="קטגוריה"' w.xml || { echo "medium layout not shown"; grep -o 'text="[^"]*"' w.xml | head -30; exit 1; }
 tap =2; tap =8
 shot widget-6-medium
+adb logcat -d | grep -E "WidgetPreview|QuickAddWidget|AndroidRuntime|FATAL|RemoteViews|AppWidgetHostView" | tail -40
 tap "קטגוריה"
 sleep 2
 dump; grep -q '₪28 · על מה?' w.xml || { echo "picker sheet missing"; grep -o 'text="[^"]*"' w.xml | head -30; exit 1; }

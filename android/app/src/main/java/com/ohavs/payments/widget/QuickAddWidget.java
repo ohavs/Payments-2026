@@ -173,6 +173,7 @@ public class QuickAddWidget extends AppWidgetProvider {
             m.updateAppWidget(id, v);
             return;
         }
+        android.util.Log.i("QuickAddWidget", "render " + id + " " + WidgetStore.state(c, id));
         if (Build.VERSION.SDK_INT >= 31) {
             Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
             for (int size = SMALL; size <= LARGE; size++) {

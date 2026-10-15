@@ -44,7 +44,19 @@ public class WidgetPreviewActivity extends Activity {
         }
         AppWidgetManager m = AppWidgetManager.getInstance(this);
         ComponentName provider = new ComponentName(this, QuickAddWidget.class);
-        host = new AppWidgetHost(this, HOST_ID);
+        // Logs every update it receives (CI diagnostics).
+        host = new AppWidgetHost(this, HOST_ID) {
+            @Override
+            protected AppWidgetHostView onCreateView(android.content.Context context, int appWidgetId, AppWidgetProviderInfo appWidget) {
+                return new AppWidgetHostView(context) {
+                    @Override
+                    public void updateAppWidget(android.widget.RemoteViews remoteViews) {
+                        android.util.Log.i("WidgetPreview", "update for " + appWidgetId + " at " + getWidth() + "x" + getHeight() + "px");
+                        super.updateAppWidget(remoteViews);
+                    }
+                };
+            }
+        };
         int id = host.allocateAppWidgetId();
         if (!m.bindAppWidgetIdIfAllowed(id, provider)) {
             host.deleteAppWidgetId(id);
