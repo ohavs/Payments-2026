@@ -87,7 +87,9 @@
 - [x] ערכות צבע (הגדרות ← מראה): קלאסי · לילך · שקיעה · ים · דבש. `settings.palette` (מסונכרן) + `localStorage` לפתיחה מהירה, `[data-palette]` ב־`styles.css` (accent + טקסטורה ב־`.app-bg::before`), favicon, צבע התזכורות, הווידג׳ט (`WidgetTheme`, drawables לכל ערכה)
   - סמלים: מקור אחד `src/lib/app-icons.js` (SVG), `node scripts/make_icons.mjs` מייצר mipmaps לכל ערכה + אייקוני ווב (במקום `make_icons.py`)
   - סמל המשגר: activity-alias לכל ערכה. הפעילות האמיתית היא `AppActivity`; ה־alias `.MainActivity` (ירוק, ברירת מחדל) שומר על אייקונים קיימים במסך הבית. ההחלפה (`AppIcons`) רק ב־`onUserLeaveHint`/יציאה, כי המערכת סוגרת את המסך שנפתח דרך alias שכובה. הסמל מתחלף רק במכשיר שבו בחרו
-  - טרם נבדק בטלפון אמיתי: החלפת הסמל (במשגרים רבים האייקון נעלם ממסך הבית וצריך לגרור מחדש)
+  - v2.0.69 בטלפון (Samsung): הסמל לא התחלף. כנראה `onUserLeaveHint` לא מגיע ביציאה בהחלקה. תוקן: ההחלפה גם ב־`onStop`, חוץ ממצב שבו האפליקציה פתחה מסך אחר שחוזרים ממנו (`startActivityForResult`/`startIntentSenderForResult` מסמנים). כפתור "להחליף את הסמל עכשיו" (`applyNow`: `moveTaskToBack` ואז החלפה)
+  - CI: `widget-shots.sh` כותב pending ל־prefs, יוצא עם HOME, בודק שה־launcher entry הוא `.IconViolet`, פותח דרכו ומצלם את רשימת האפליקציות, וחוזר לירוק
+  - טרם אומת בטלפון האמיתי אחרי התיקון
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 
