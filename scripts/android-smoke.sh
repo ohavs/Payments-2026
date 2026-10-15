@@ -6,21 +6,30 @@ APK=$1
 adb install -r "$APK"
 adb shell dumpsys package com.ohavs.payments | grep -E "versionCode|versionName" | head -2
 adb logcat -c
+# A slow first boot can leave a "System UI isn't responding" dialog on top.
+close_dialogs() { adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true; }
+close_dialogs
 adb shell am start -W -n com.ohavs.payments/.MainActivity
-for i in $(seq 1 20); do
+START=$(date +%s)
+while [ $(( $(date +%s) - START )) -lt 120 ]; do
   sleep 3
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || continue
   adb pull /sdcard/ui.xml ui.xml >/dev/null 2>&1 || continue
   if grep -q "המשך עם Google" ui.xml; then
-    echo "login screen rendered after $((i * 3))s"
+    echo "login screen rendered after $(( $(date +%s) - START ))s"
     adb exec-out screencap -p > android-smoke.png
     booted=1
     break
   fi
+  if grep -qiE "isn.t responding|keeps stopping" ui.xml; then
+    echo "system dialog on screen, closing it"; close_dialogs
+    adb shell am start -n com.ohavs.payments/.MainActivity >/dev/null
+  fi
 done
 if [ -z "${booted:-}" ]; then
   echo "login screen never appeared"; adb exec-out screencap -p > android-smoke.png || true
-  adb logcat -d | grep -iE "chromium|console|capacitor|AndroidRuntime" | tail -120
+  echo "on screen:"; grep -o 'text="[^"]\+"\|package="[^"]*"' ui.xml 2>/dev/null | sort | uniq -c | sort -rn | head -30 || true
+  adb logcat -d | grep -iE "chromium|console|capacitor|AndroidRuntime|ANR" | grep -v "uiautomator\|RuntimeInit\|boot image\|lock profiling\|nativeloader\|Shutting down VM" | tail -80
   exit 1
 fi
 

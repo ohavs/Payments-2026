@@ -116,8 +116,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ls widget-*.png >/dev/null 2>&1 || exit 0
-          mkdir shots && cp widget-*.png android-smoke.png shots/ 2>/dev/null || true
+          ls widget-*.png android-smoke.png >/dev/null 2>&1 || ls android-smoke.png >/dev/null 2>&1 || exit 0
+          mkdir shots && cp widget-*.png android-smoke.png ui.xml shots/ 2>/dev/null || true
           cd shots
           git init -q -b ci-shots
           git add .
