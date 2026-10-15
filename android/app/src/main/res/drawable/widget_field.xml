@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Text field in the new-category dialog (the app's inputs). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/w_surface_2" />
+    <corners android:radius="16dp" />
+</shape>

@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the widget picker shows (Android 12+): widget_quick_add.xml with an
+     amount typed and a category picked. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- Amount (with the space or the last save under it) and the space switch. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/amount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/rubik_extrabold"
+                android:gravity="start"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="₪45"
+                android:textColor="@color/w_ink"
+                android:textDirection="ltr"
+                android:textSize="32sp" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/rubik_semibold"
+                android:maxLines="1"
+                android:text="הוצאה חדשה · אישי"
+                android:textColor="@color/w_ink_dim"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/space"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/widget_pill_ink"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="10dp">
+
+            <TextView
+                android:id="@+id/space_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/rubik_extrabold"
+                android:maxLines="1"
+                android:maxWidth="110dp"
+                android:text="אישי"
+                android:textColor="@color/w_on_ink"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:id="@+id/space_swap"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="6dp"
+                android:contentDescription="החלף מרחב"
+                android:src="@drawable/ic_w_swap" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Categories (scrolls) and the keypad, side by side. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginBottom="3dp"
+                android:background="@drawable/widget_row_selected"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="5dp"
+                android:paddingEnd="8dp">
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp">
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/widget_circle"
+                        android:tint="@color/w_mint" />
+                    <ImageView
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_cat_cart" />
+                </FrameLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/rubik_semibold"
+                    android:maxLines="1"
+                    android:text="קניות"
+                    android:textColor="@color/w_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginBottom="3dp"
+                android:background="@drawable/widget_row"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="5dp"
+                android:paddingEnd="8dp">
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp">
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/widget_circle"
+                        android:tint="@color/w_peach" />
+                    <ImageView
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_cat_food" />
+                </FrameLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/rubik_semibold"
+                    android:maxLines="1"
+                    android:text="אוכל בחוץ"
+                    android:textColor="@color/w_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginBottom="3dp"
+                android:background="@drawable/widget_row"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="5dp"
+                android:paddingEnd="8dp">
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp">
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/widget_circle"
+                        android:tint="@color/w_lavender" />
+                    <ImageView
+                        android:layout_width="19dp"
+                        android:layout_height="19dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_cat_shield" />
+                </FrameLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/rubik_semibold"
+                    android:maxLines="1"
+                    android:text="ביטוחים"
+                    android:textColor="@color/w_ink"
+                    android:textSize="14sp" />
+            </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/new_category"
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/widget_dashed"
+                android:fontFamily="@font/rubik_extrabold"
+                android:gravity="center"
+                android:text="+ קטגוריה חדשה"
+                android:textColor="@color/w_ink"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layoutDirection="ltr"
+            android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/key_1"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_2"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="2"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_3"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="3"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/key_4"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="4"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_5"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="5"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_6"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="6"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/key_7"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="7"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_8"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="8"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_9"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="9"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/key_dot"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="."
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <TextView
+                    android:id="@+id/key_0"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/widget_key"
+                    android:fontFamily="@font/rubik_extrabold"
+                    android:gravity="center"
+                    android:text="0"
+                    android:textColor="@color/w_ink"
+                    android:textSize="20sp" />
+                <ImageView
+                    android:id="@+id/key_del"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@drawable/widget_key"
+                    android:contentDescription="מחק"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_w_backspace" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/save"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/widget_btn_primary"
+        android:fontFamily="@font/rubik_extrabold"
+        android:gravity="center"
+        android:paddingBottom="4dp"
+        android:text="שמור · ₪45"
+        android:textColor="@color/w_accent_fg"
+        android:textSize="16sp" />
+</LinearLayout>

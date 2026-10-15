@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "+ משותף"-style dashed pill. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/w_surface_2" />
+            <stroke android:width="2dp" android:color="@color/w_surface_3" android:dashWidth="5dp" android:dashGap="4dp" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <stroke android:width="2dp" android:color="@color/w_surface_3" android:dashWidth="5dp" android:dashGap="4dp" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</selector>

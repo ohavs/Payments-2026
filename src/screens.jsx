@@ -12,6 +12,7 @@ import { ListCard, SectionHeader } from './payment-card.jsx';
 import { ensureNativeNotifPermission, nativeNotifPermission, sendNativeTestNotification } from './lib/reminders.js';
 import { detectStatus, openDetectAccess, setDetectEnabled } from './lib/detect.js';
 import { silentGmailToken } from './lib/gmail.js';
+import { pinWidget, widgetStatus } from './lib/widget.js';
 import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
@@ -351,6 +352,20 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       setTimeout(() => openDetectAccess(), 700);
     }
   };
+  // Home screen widget: ask the launcher to add it.
+  const [widgetCount, setWidgetCount] = useState(0);
+  useEffect(() => {
+    if (!isNative) return undefined;
+    const check = () => widgetStatus().then((s) => setWidgetCount(s.count)).catch(() => {});
+    check();
+    const h = CapApp.addListener('resume', check);
+    return () => { h.then((x) => x.remove()); };
+  }, []);
+  const addWidget = async () => {
+    haptic('tap');
+    if (!(await pinWidget())) toast('לחיצה ארוכה על מסך הבית ← ווידג׳טים ← תשלומים', { type: 'info' });
+  };
+
   // Gmail in the background: needs the read access from a first manual scan.
   const toggleGmailAuto = async (on) => {
     if (!on) { onGmailAuto(false); return; }
@@ -456,6 +471,11 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
         <Row icon="user" tint="var(--lavender)" label="מרחבים ושיתוף"
           sub={`${lists.activeList?.name || 'ההוצאות שלי'}${members > 1 ? ` · ${members} משתתפים` : ''}`}
           onClick={() => setManageOpen(true)} right={chevron} />
+        {isNative && (
+          <Row icon="plus" tint="var(--peach)" label="ווידג׳ט למסך הבית"
+            sub={widgetCount > 0 ? 'על מסך הבית ✓ · סכום, קטגוריה ושמירה' : 'הוספת הוצאה בלי לפתוח את האפליקציה'}
+            onClick={addWidget} right={chevron} />
+        )}
         <Row icon="download" tint="var(--sky)" label="ייצוא הוצאות" sub={`קובץ CSV של ${lists.activeList?.name || 'ההוצאות שלי'}`}
           onClick={exportExpenses} right={chevron} />
         <Row icon="shekel" tint="var(--butter)" label="מטבע"

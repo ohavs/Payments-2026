@@ -23,6 +23,7 @@ import { ensureNativeNotifPermission, onReminderTap, syncReminders } from './lib
 import { bindForegroundPush, onPushTap, registerNativePush } from './lib/push.js';
 import { App as CapApp } from '@capacitor/app';
 import { checkForUpdateQuietly } from './lib/updater.js';
+import { clearWidget, syncWidget, takeWidgetPending } from './lib/widget.js';
 
 // 'system' follows the phone; 'light' / 'dark' are explicit choices.
 function useTheme(pref) {
@@ -55,6 +56,30 @@ function AppInner() {
   const [settings, setSettings, { loading: settingsLoading }] = useFirebaseSettings(user?.uid, user?.displayName);
   const lists = useLists(user?.uid, user);
   const categories = lists.activeList?.groups?.length ? lists.activeList.groups : DEFAULT_CATEGORIES;
+
+  // Home screen widget: who is signed in, the spaces and their categories.
+  const widgetSpaces = useMemo(() => JSON.stringify(lists.spaces.map((l) => ({
+    id: l.id, name: l.name || '', shared: isSharedList(l), groups: l.groups?.length ? l.groups : DEFAULT_CATEGORIES,
+  }))), [lists.spaces]);
+  useEffect(() => {
+    if (!isNative) return;
+    if (!user) { if (!authLoading) clearWidget(); return; }
+    if (!lists.spaces.length) return;
+    syncWidget({ spaces: JSON.parse(widgetSpaces), activeSpaceId: lists.activeListId, currency: settings.defaultCurrency || '₪' });
+  }, [user?.uid, authLoading, widgetSpaces, lists.activeListId, settings.defaultCurrency]);
+  // Expenses the widget saved without a connection.
+  const hasSpaces = lists.spaces.length > 0;
+  useEffect(() => {
+    if (!isNative || !user || !hasSpaces) return undefined;
+    const flush = async () => {
+      for (const { listId, item } of await takeWidgetPending()) {
+        try { await lists.ops.addItem(listId, item); } catch (e) { console.error('widget expense', e); }
+      }
+    };
+    flush();
+    const h = CapApp.addListener('resume', flush);
+    return () => { h.then((x) => x.remove()); };
+  }, [user?.uid, hasSpaces]);
 
   // The active space drives the whole app. A shared space has its own
   // subscriptions (lists/{id}/subs) and its own budget (list.budget); the

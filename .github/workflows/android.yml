@@ -100,7 +100,7 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash scripts/android-smoke.sh payments.apk
+          script: bash scripts/android-smoke.sh payments.apk && bash scripts/widget-shots.sh
       - uses: actions/upload-artifact@v5
         if: always()
         with:
@@ -108,6 +108,20 @@ jobs:
           path: |
             android-smoke.png
             ui.xml
+            widget-*.png
+      # The widget screenshots, also on a branch for review from a git checkout.
+      - name: Publish widget screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls widget-*.png >/dev/null 2>&1 || exit 0
+          mkdir shots && cp widget-*.png android-smoke.png shots/ 2>/dev/null || true
+          cd shots
+          git init -q -b ci-shots
+          git add .
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Widget screenshots for $GITHUB_SHA"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-shots
 
   # Publish only after the APK booted on the emulator, and only from the served
   # branch. The app's "check for updates" reads the latest release.

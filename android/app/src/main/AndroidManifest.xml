@@ -38,6 +38,38 @@
         <receiver
             android:name=".detect.DismissReceiver"
             android:exported="false" />
+        <!-- Home screen widget: quick add (amount, category, save). -->
+        <receiver
+            android:name=".widget.QuickAddWidget"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_add_widget" />
+        </receiver>
+        <service
+            android:name=".widget.CategoryListService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <activity
+            android:name=".widget.NewCategoryActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.ohavs.payments.widget"
+            android:theme="@style/WidgetSheet"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
+        <!-- CI screenshots of the widget (not exported: adb as root only). -->
+        <activity
+            android:name=".widget.WidgetPreviewActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
         <!-- Gmail receipts: hourly check in the background once the user turned it on. -->
         <service
             android:name=".detect.GmailReceiptJob"

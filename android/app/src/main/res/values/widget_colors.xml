@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's design tokens (src/styles.css, light) for the home screen widget. -->
+<resources>
+    <color name="w_surface">#FFFFFF</color>
+    <color name="w_surface_2">#F0F0EC</color>
+    <color name="w_surface_3">#E5E5E0</color>
+    <color name="w_ink">#141414</color>
+    <color name="w_ink_dim">#5F5F66</color>
+    <color name="w_stroke">#141414</color>
+    <color name="w_accent">#22A45D</color>
+    <color name="w_accent_fg">#141414</color>
+    <color name="w_accent_soft">#E3F3EA</color>
+    <color name="w_accent_ink">#157A3B</color>
+    <color name="w_on_ink">#F6F6F3</color>
+    <color name="w_danger">#D92D20</color>
+    <color name="w_mint">#E6F4EC</color>
+    <color name="w_lavender">#EEEDFE</color>
+    <color name="w_peach">#FFF1E6</color>
+    <color name="w_sky">#E7F0FF</color>
+    <color name="w_butter">#FFF7D6</color>
+    <color name="w_rose">#FDECEC</color>
+</resources>
