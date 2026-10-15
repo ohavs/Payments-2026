@@ -57,6 +57,10 @@ public class WidgetPreviewActivity extends Activity {
                 };
             }
         };
+        // The previous run was force-stopped without stopListening, so its
+        // record still points at a dead listener; an update sent there makes
+        // the system drop the listener of the same host id. Start clean.
+        host.deleteHost();
         int id = host.allocateAppWidgetId();
         if (!m.bindAppWidgetIdIfAllowed(id, provider)) {
             host.deleteAppWidgetId(id);
@@ -79,18 +83,15 @@ public class WidgetPreviewActivity extends Activity {
         setContentView(root);
         view.post(() -> android.util.Log.i("WidgetPreview", "host view " + view.getWidth() / getResources().getDisplayMetrics().density
             + "x" + view.getHeight() / getResources().getDisplayMetrics().density + " dp, padding " + view.getPaddingLeft() + "," + view.getPaddingTop()));
+        // Listen before the first render, and also while the category sheet
+        // covers this activity, so no update is missed.
+        host.startListening();
         QuickAddWidget.render(this, m, id);
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-        if (host != null) host.startListening();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
+    protected void onDestroy() {
+        super.onDestroy();
         if (host != null) host.stopListening();
     }
 

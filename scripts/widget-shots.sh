@@ -68,6 +68,7 @@ adb shell input keyevent KEYCODE_BACK; sleep 0.5; adb shell input keyevent KEYCO
 open_widget 260 300
 dump; grep -q 'content-desc="קטגוריה"' w.xml || { echo "medium layout not shown"; grep -o 'text="[^"]*"' w.xml | head -30; exit 1; }
 tap =2; tap =8
+dump; grep -q 'text="₪28"' w.xml || { echo "medium widget did not update"; grep -o 'text="[^"]*"' w.xml | head -30; adb logcat -d | grep -E "WidgetPreview|AppWidgetServiceImpl" | tail -20; exit 1; }
 shot widget-6-medium
 adb logcat -d | grep -E "WidgetPreview|QuickAddWidget|AndroidRuntime|FATAL|RemoteViews|AppWidgetHostView" | tail -40
 tap "קטגוריה"
