@@ -58,9 +58,14 @@ function AppInner() {
   const categories = lists.activeList?.groups?.length ? lists.activeList.groups : DEFAULT_CATEGORIES;
 
   // Home screen widget: who is signed in, the spaces and their categories.
-  const widgetSpaces = useMemo(() => JSON.stringify(lists.spaces.map((l) => ({
-    id: l.id, name: l.name || '', shared: isSharedList(l), groups: l.groups?.length ? l.groups : DEFAULT_CATEGORIES,
-  }))), [lists.spaces]);
+  // The label is what the app's space switcher shows ("אישי", or names).
+  const widgetSpaces = useMemo(() => {
+    const personal = lists.spaces.filter((l) => !isSharedList(l)).length;
+    return JSON.stringify(lists.spaces.map((l) => ({
+      id: l.id, name: l.name || '', shared: isSharedList(l), groups: l.groups?.length ? l.groups : DEFAULT_CATEGORIES,
+      label: isSharedList(l) ? (l.name || 'משותף') : (personal > 1 ? (l.name || 'אישי') : 'אישי'),
+    })));
+  }, [lists.spaces]);
   useEffect(() => {
     if (!isNative) return;
     if (!user) { if (!authLoading) clearWidget(); return; }

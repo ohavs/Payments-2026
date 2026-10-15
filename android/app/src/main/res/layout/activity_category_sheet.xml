@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- "קטגוריה חדשה" from the widget, styled like the app's sheets. -->
+<!-- The widget's category picker (the compact sizes' "dropdown") and new
+     category field, as a bottom sheet in the app's style. Tiles and space
+     pills are added in code (CategorySheetActivity). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/scrim"
     android:layoutDirection="rtl"
@@ -15,10 +17,10 @@
         android:clickable="true"
         android:focusable="true"
         android:orientation="vertical"
-        android:paddingStart="22dp"
+        android:paddingStart="20dp"
         android:paddingTop="10dp"
-        android:paddingEnd="22dp"
-        android:paddingBottom="24dp">
+        android:paddingEnd="20dp"
+        android:paddingBottom="20dp">
 
         <View
             android:layout_width="40dp"
@@ -27,68 +29,98 @@
             android:background="@drawable/widget_grabber" />
 
         <TextView
+            android:id="@+id/title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
             android:fontFamily="@font/rubik_extrabold"
-            android:text="קטגוריה חדשה"
             android:textColor="@color/w_ink"
-            android:textSize="24sp" />
+            android:textDirection="anyRtl"
+            android:textSize="23sp" />
 
         <TextView
             android:id="@+id/subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="3dp"
             android:fontFamily="@font/rubik_semibold"
             android:textColor="@color/w_ink_dim"
             android:textSize="14sp" />
 
+        <HorizontalScrollView
+            android:id="@+id/spaces_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/spaces"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <ScrollView
+            android:id="@+id/grid_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:scrollbars="none">
+
+            <GridLayout
+                android:id="@+id/grid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="3"
+                android:useDefaultMargins="false" />
+        </ScrollView>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="14dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp">
+                android:layout_width="52dp"
+                android:layout_height="52dp">
 
                 <ImageView
-                    android:id="@+id/tint"
+                    android:id="@+id/new_tint"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:importantForAccessibility="no"
                     android:src="@drawable/widget_circle" />
 
                 <ImageView
-                    android:id="@+id/sticker"
-                    android:layout_width="31dp"
-                    android:layout_height="31dp"
+                    android:id="@+id/new_sticker"
+                    android:layout_width="29dp"
+                    android:layout_height="29dp"
                     android:layout_gravity="center"
                     android:importantForAccessibility="no" />
 
                 <TextView
-                    android:id="@+id/letter"
+                    android:id="@+id/new_letter"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:fontFamily="@font/rubik_extrabold"
                     android:gravity="center"
                     android:textColor="@color/w_ink"
-                    android:textSize="22sp"
+                    android:textSize="21sp"
                     android:visibility="gone" />
             </FrameLayout>
 
             <EditText
                 android:id="@+id/name"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_marginStart="12dp"
+                android:layout_height="52dp"
+                android:layout_marginStart="10dp"
                 android:layout_weight="1"
                 android:background="@drawable/widget_field"
                 android:fontFamily="@font/rubik_semibold"
-                android:hint="למשל: דלק"
+                android:hint="קטגוריה חדשה"
                 android:imeOptions="actionDone"
                 android:importantForAutofill="no"
                 android:inputType="text"
@@ -98,20 +130,22 @@
                 android:paddingEnd="16dp"
                 android:textColor="@color/w_ink"
                 android:textColorHint="@color/w_ink_dim"
-                android:textSize="17sp" />
+                android:textSize="16sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/add"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_marginTop="20dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="14dp"
             android:background="@drawable/widget_btn_disabled"
             android:fontFamily="@font/rubik_extrabold"
             android:gravity="center"
             android:paddingBottom="4dp"
             android:text="הוסף"
             android:textColor="@color/w_ink_dim"
-            android:textSize="17sp" />
+            android:textDirection="anyRtl"
+            android:textSize="16.5sp"
+            android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

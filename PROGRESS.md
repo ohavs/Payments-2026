@@ -76,6 +76,10 @@
   - הגדרות ← "ווידג׳ט למסך הבית" (requestPinAppWidget)
   - CI: `scripts/widget-shots.sh` מארח את הווידג׳ט באמולטור (`WidgetPreviewActivity`, adb root + `appwidget grantbind`), לוחץ ומצלם. הצילומים בענף `ci-shots`
   - טרם נבדק בטלפון אמיתי: שמירה מול Firebase האמיתי (מפתח ה־API עם Referer/X-Android headers)
+- [x] ווידג׳ט, סבב 2 (בקשות 04:45/04:47 שלא הגיעו בזמן, שוחזרו מהאירועים): שלושה גדלים (`widget_quick_add[_medium|_small].xml`, `RemoteViews(Map<SizeF,…>)` ב־12+, `onAppWidgetOptionsChanged` לפני), "dropdown" קטגוריות → `CategorySheetActivity` (מרחבים, קטגוריות, חדשה; עם סכום, בחירה שומרת), insets של המקלדת, לחיצה על ריק פותחת את האפליקציה, תוויות מרחב מהאפליקציה
+  - "אישי" כפול: מרחבים אישיים בשם ברירת המחדל מתמזגים לישן (פריטים ומנויים עם אותם ids, איחוד קטגוריות). e2e `merge.spec.js`
+- [x] אייקון: רקע ירוק מלא + ₪ ב־Rubik ExtraBold, שכבת monochrome (`scripts/make_icons.py`)
+- [x] הגדרות: קבוצות מתקפלות, נזכר לכל קבוצה (`settings.open.<כותרת>` ב־localStorage)
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 

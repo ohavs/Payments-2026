@@ -7,7 +7,9 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.SizeF;
 import android.util.Base64;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -17,6 +19,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 /**
  * CI only (not exported; started with adb as root after
@@ -56,6 +59,11 @@ public class WidgetPreviewActivity extends Activity {
         root.setBackgroundColor(Color.parseColor("#7FA4C9"));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h, Gravity.CENTER);
         root.addView(view, lp);
+        // Tell the host view its size, so it shows the layout for that size.
+        if (Build.VERSION.SDK_INT >= 31) {
+            float wd = getIntent().getIntExtra("widthDp", 360), hd = getIntent().getIntExtra("heightDp", 360);
+            view.updateAppWidgetSize(new Bundle(), Collections.singletonList(new SizeF(wd, hd)));
+        }
         setContentView(root);
         QuickAddWidget.render(this, m, id);
     }

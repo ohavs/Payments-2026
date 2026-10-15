@@ -6,7 +6,7 @@ import { CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, coun
 import { occurrencesBetween } from './lib/recurrence.js';
 import { appVersion, haptic, isNative } from './lib/platform.js';
 import { Spinner, useToast } from './feedback.jsx';
-import { ManageExpensesSheet } from './lists.jsx';
+import { ManageExpensesSheet, useStickyState } from './lists.jsx';
 import { ensureNotifPermission, notifPermission, registerFcmToken, showLocalNotification } from './notifications.jsx';
 import { ListCard, SectionHeader } from './payment-card.jsx';
 import { ensureNativeNotifPermission, nativeNotifPermission, sendNativeTestNotification } from './lib/reminders.js';
@@ -589,19 +589,34 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   );
 }
 
+// A settings card under a title; tapping the title folds it away. Each
+// group remembers whether it was open (per phone).
 function SettingsGroup({ title, children }) {
   const items = React.Children.toArray(children).filter(Boolean);
+  const [open, setOpen] = useStickyState(`settings.open.${title}`, true);
   return (
-    <div className="rise" style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--ink-dim)', padding: '0 6px 8px' }}>
-        {title}
-      </div>
-      <div style={{ background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', borderRadius: 24, overflow: 'hidden' }}>
-        {items.map((child, i) => (
-          <div key={i} style={{ borderTop: i ? '1px solid var(--divider)' : 'none' }}>
-            {child}
+    <div className="rise" style={{ marginBottom: open ? 20 : 8 }}>
+      <button onClick={() => { haptic('tap'); setOpen((o) => !o); }} aria-expanded={open} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        padding: '6px 6px 8px', border: 'none', background: 'transparent', cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 13.5, fontWeight: 800, color: 'var(--ink-dim)', textAlign: 'start',
+      }}>
+        <span>{title}</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style={{
+          transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .3s var(--ease-out)',
+        }}><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
+      <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows .32s var(--ease-out)' }}>
+        {/* The padding keeps the card's shadow inside the clipped area. */}
+        <div style={{ overflow: 'hidden', minHeight: 0, padding: open ? '0 6px 16px' : '0 6px', margin: open ? '0 -6px -16px' : '0 -6px' }} inert={!open}>
+          <div style={{ background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', borderRadius: 24, overflow: 'hidden' }}>
+            {items.map((child, i) => (
+              <div key={i} style={{ borderTop: i ? '1px solid var(--divider)' : 'none' }}>
+                {child}
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

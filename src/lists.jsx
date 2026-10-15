@@ -135,25 +135,40 @@ function useLists(uid, user) {
     }
   }, [uid, loading, serverLoaded, lists]);
 
-  // Clean up personal spaces created twice by that bug: same default name,
-  // only me in it, no expenses. The oldest one is always kept.
+  // Personal spaces created twice by that bug (same default name, only me in
+  // them): merge them into the oldest one. Expenses and subscriptions move
+  // over with their ids, categories are combined, the extra space is deleted.
   React.useEffect(() => {
     if (!uid || !serverLoaded || cleanedRef.current) return;
     cleanedRef.current = true;
     const created = (l) => l.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER;
-    const dupes = lists
+    const mine = lists
       .filter(l => l.name === 'ההוצאות שלי' && l.ownerUid === uid && !isSharedList(l))
-      .sort((a, b) => created(a) - created(b))
-      .slice(1);
-    dupes.forEach(async (l) => {
-      try {
-        const [items, subs] = await Promise.all([
-          fbDb.collection('lists').doc(l.id).collection('items').limit(1).get(),
-          fbDb.collection('lists').doc(l.id).collection('subs').limit(1).get(),
-        ]);
-        if (items.empty && subs.empty) await fbDb.collection('lists').doc(l.id).delete();
-      } catch (e) { console.error('cleanup duplicate space', e); }
-    });
+      .sort((a, b) => created(a) - created(b));
+    if (mine.length < 2) return;
+    const [keep, ...dupes] = mine;
+    (async () => {
+      const col = fbDb.collection('lists');
+      for (const l of dupes) {
+        try {
+          for (const sub of ['items', 'subs']) {
+            const snap = await col.doc(l.id).collection(sub).get();
+            // A batch holds up to 500 writes: copy + delete per document.
+            for (let i = 0; i < snap.docs.length; i += 200) {
+              const batch = fbDb.batch();
+              snap.docs.slice(i, i + 200).forEach((d) => {
+                batch.set(col.doc(keep.id).collection(sub).doc(d.id), d.data());
+                batch.delete(d.ref);
+              });
+              await batch.commit();
+            }
+          }
+          const groups = [...new Set([...(keep.groups || DEFAULT_CATEGORIES), ...(l.groups || [])])];
+          await col.doc(keep.id).set({ groups }, { merge: true });
+          await col.doc(l.id).delete();
+        } catch (e) { console.error('merge duplicate space', e); }
+      }
+    })();
   }, [uid, serverLoaded, lists]);
 
   // A space just created or joined is selected before the snapshot that brings

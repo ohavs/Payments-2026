@@ -8,6 +8,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
+import android.util.ArrayMap;
+import android.util.SizeF;
+import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import com.ohavs.payments.MainActivity;
@@ -16,6 +21,8 @@ import com.ohavs.payments.R;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.Map;
 
 /**
  * Home screen widget: type an amount on the keypad, tap a category (or add
@@ -154,6 +161,11 @@ public class QuickAddWidget extends AppWidgetProvider {
         if (ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.categories);
     }
 
+    // Layouts by size (dp), smallest first. Android 12+ picks the biggest that
+    // fits by itself as the widget is resized; older launchers ask us.
+    private static final int SMALL = 0, MEDIUM = 1, LARGE = 2;
+    private static final float[][] SIZES = {{150f, 140f}, {200f, 230f}, {290f, 270f}};
+
     static void render(Context c, AppWidgetManager m, int id) {
         if (!WidgetStore.signedIn(c)) {
             RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_signed_out);
@@ -161,65 +173,133 @@ public class QuickAddWidget extends AppWidgetProvider {
             m.updateAppWidget(id, v);
             return;
         }
+        if (Build.VERSION.SDK_INT >= 31) {
+            Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
+            for (int size = SMALL; size <= LARGE; size++) {
+                bySize.put(new SizeF(SIZES[size][0], SIZES[size][1]), build(c, id, size));
+            }
+            m.updateAppWidget(id, new RemoteViews(bySize));
+        } else {
+            m.updateAppWidget(id, build(c, id, sizeFor(m.getAppWidgetOptions(id))));
+        }
+    }
+
+    /** Before Android 12: from the size the launcher reports (portrait: min width, max height). */
+    private static int sizeFor(Bundle o) {
+        int w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300);
+        int h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        if (w >= SIZES[LARGE][0] && h >= SIZES[LARGE][1]) return LARGE;
+        if (w >= SIZES[MEDIUM][0] && h >= SIZES[MEDIUM][1]) return MEDIUM;
+        return SMALL;
+    }
+
+    @Override
+    public void onAppWidgetOptionsChanged(Context c, AppWidgetManager m, int id, Bundle options) {
+        if (Build.VERSION.SDK_INT < 31) render(c, m, id);
+    }
+
+    private static RemoteViews build(Context c, int id, int size) {
         JSONObject s = WidgetStore.state(c, id);
         JSONObject space = WidgetStore.space(c, s.optString("spaceId"));
-        RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_quick_add);
+        int layout = size == LARGE ? R.layout.widget_quick_add
+            : size == MEDIUM ? R.layout.widget_quick_add_medium : R.layout.widget_quick_add_small;
+        RemoteViews v = new RemoteViews(c.getPackageName(), layout);
+        // Anywhere that isn't a key or a button opens the app.
+        v.setOnClickPendingIntent(R.id.root, openApp(c));
 
         String amount = s.optString("amount");
-        v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
-        v.setTextColor(R.id.amount, c.getColor(amount.isEmpty() ? R.color.w_ink_dim : R.color.w_ink));
         String status = s.optString("status");
-        v.setTextViewText(R.id.status, !status.isEmpty() ? status
-            : space == null ? "" : "הוצאה חדשה · " + spaceLabel(c, space));
+        boolean busy = s.optBoolean("busy");
+        double value = AmountInput.value(amount);
+        String category = s.optString("category");
 
-        // The space switch, only when there is more than one.
-        boolean many = WidgetStore.spaces(c).length() > 1;
-        v.setViewVisibility(R.id.space, many ? android.view.View.VISIBLE : android.view.View.GONE);
-        if (space != null) v.setTextViewText(R.id.space_name, spaceLabel(c, space));
-        v.setOnClickPendingIntent(R.id.space, broadcast(c, id, ACTION_SPACE, "space", null));
+        if (size == LARGE) {
+            v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
+            v.setTextViewText(R.id.status, !status.isEmpty() ? status
+                : space == null ? "" : "הוצאה חדשה · " + spaceLabel(c, space));
+        } else if (amount.isEmpty() && !status.isEmpty()) {
+            // Compact sizes: the last save shows in place of the empty amount.
+            v.setTextViewText(R.id.amount, status);
+            v.setTextViewTextSize(R.id.amount, TypedValue.COMPLEX_UNIT_SP, size == MEDIUM ? 15 : 13);
+        } else {
+            v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
+        }
+        v.setTextColor(R.id.amount, c.getColor(amount.isEmpty() ? R.color.w_ink_dim : R.color.w_ink));
 
         for (int i = 0; i < KEY_IDS.length; i++) {
             v.setOnClickPendingIntent(KEY_IDS[i], broadcast(c, id, ACTION_KEY, "key/" + KEYS[i], KEYS[i]));
         }
 
-        // Categories of the space (RemoteViewsService), tap to pick.
-        Intent list = new Intent(c, CategoryListService.class)
-            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
-        list.setData(Uri.parse("payments-widget://" + id + "/categories"));
-        v.setRemoteAdapter(R.id.categories, list);
-        Intent pick = new Intent(c, QuickAddWidget.class).setAction(ACTION_CATEGORY)
-            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-            .setData(Uri.parse("payments-widget://" + id + "/category"));
-        int mutable = Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0;
-        v.setPendingIntentTemplate(R.id.categories, PendingIntent.getBroadcast(c, id, pick, PendingIntent.FLAG_UPDATE_CURRENT | mutable));
+        if (size == LARGE) {
+            // The space switch, only when there is more than one.
+            boolean many = WidgetStore.spaces(c).length() > 1;
+            v.setViewVisibility(R.id.space, many ? View.VISIBLE : View.GONE);
+            if (space != null) v.setTextViewText(R.id.space_name, spaceLabel(c, space));
+            v.setOnClickPendingIntent(R.id.space, broadcast(c, id, ACTION_SPACE, "space", null));
 
-        Intent add = new Intent(c, NewCategoryActivity.class)
-            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            .setData(Uri.parse("payments-widget://" + id + "/new-category"));
-        v.setOnClickPendingIntent(R.id.new_category,
-            PendingIntent.getActivity(c, id, add, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+            // Categories of the space (RemoteViewsService), tap to pick.
+            Intent list = new Intent(c, CategoryListService.class)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+            list.setData(Uri.parse("payments-widget://" + id + "/categories"));
+            v.setRemoteAdapter(R.id.categories, list);
+            Intent pick = new Intent(c, QuickAddWidget.class).setAction(ACTION_CATEGORY)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .setData(Uri.parse("payments-widget://" + id + "/category"));
+            int mutable = Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0;
+            v.setPendingIntentTemplate(R.id.categories, PendingIntent.getBroadcast(c, id, pick, PendingIntent.FLAG_UPDATE_CURRENT | mutable));
+            v.setOnClickPendingIntent(R.id.new_category, sheet(c, id, true));
+        } else {
+            // The category "dropdown": the picked one, or a prompt; opens the sheet.
+            v.setOnClickPendingIntent(R.id.category_chip, sheet(c, id, false));
+            CategoryStyle st = CategoryStyle.of(category);
+            boolean none = category.isEmpty();
+            v.setInt(R.id.chip_tint, "setColorFilter", c.getColor(none ? R.color.w_surface_3 : CategoryListService.tintRes(st.tint)));
+            if (!none && st.icon != null) {
+                v.setImageViewResource(R.id.chip_sticker, CategoryListService.iconRes(st.icon));
+                v.setViewVisibility(R.id.chip_sticker, View.VISIBLE);
+                v.setViewVisibility(R.id.chip_letter, View.GONE);
+            } else {
+                v.setTextViewText(R.id.chip_letter, none ? "?" : st.letter);
+                v.setViewVisibility(R.id.chip_sticker, View.GONE);
+                v.setViewVisibility(R.id.chip_letter, View.VISIBLE);
+            }
+            if (size == MEDIUM) v.setTextViewText(R.id.chip_name, none ? "קטגוריה" : category);
+        }
 
         // Save: enabled once there is an amount and a category.
-        boolean busy = s.optBoolean("busy");
-        double value = AmountInput.value(amount);
-        String category = s.optString("category");
         boolean ready = value > 0 && !category.isEmpty() && !busy;
         v.setInt(R.id.save, "setBackgroundResource", ready ? R.drawable.widget_btn_primary : R.drawable.widget_btn_disabled);
         v.setTextColor(R.id.save, c.getColor(ready ? R.color.w_accent_fg : R.color.w_ink_dim));
-        v.setTextViewText(R.id.save, busy ? "שומר…"
-            : value <= 0 ? "הקלידו סכום"
-            : category.isEmpty() ? "בחרו קטגוריה"
-            : "שמור · " + currency(c) + AmountInput.format(amount));
-        v.setOnClickPendingIntent(R.id.save, broadcast(c, id, ACTION_SAVE, "save", null));
-
-        m.updateAppWidget(id, v);
+        if (size != SMALL) {
+            v.setTextViewText(R.id.save, busy ? "שומר…"
+                : value <= 0 ? "הקלידו סכום"
+                : category.isEmpty() ? "בחרו קטגוריה"
+                : "שמור · " + currency(c) + AmountInput.format(amount));
+        } else {
+            v.setTextViewText(R.id.save, busy ? "…" : "✓");
+        }
+        // Without a category yet, save opens the picker (which then saves).
+        v.setOnClickPendingIntent(R.id.save, value > 0 && category.isEmpty()
+            ? sheet(c, id, false) : broadcast(c, id, ACTION_SAVE, "save", null));
+        return v;
     }
 
+    /** The space's label: "אישי" or the shared space's name (from the app, which knows the rest). */
     static String spaceLabel(Context c, JSONObject space) {
+        String label = space.optString("label");
+        if (!label.isEmpty()) return label;
         String name = space.optString("name");
         if (space.optBoolean("shared")) return name.isEmpty() ? "משותף" : name;
         return "אישי";
+    }
+
+    private static PendingIntent sheet(Context c, int id, boolean newCategory) {
+        Intent i = new Intent(c, CategorySheetActivity.class)
+            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+            .putExtra(CategorySheetActivity.EXTRA_NEW, newCategory)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .setData(Uri.parse("payments-widget://" + id + "/sheet/" + (newCategory ? "new" : "pick")));
+        return PendingIntent.getActivity(c, id, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     private static PendingIntent broadcast(Context c, int id, String action, String path, String key) {

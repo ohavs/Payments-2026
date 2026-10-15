@@ -46,5 +46,21 @@ test('expenses, quick add, subscriptions and settings', async ({ page, context }
   await page.getByRole('button', { name: 'כהה', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
+  // Settings groups fold away and stay that way.
+  const appearance = page.getByRole('button', { name: 'מראה' });
+  await appearance.click();
+  await expect(appearance).toHaveAttribute('aria-expanded', 'false');
+  const folded = () => page.getByText('כהה', { exact: true }).evaluate((el) => {
+    const box = el.closest('[inert]');
+    return !!box && box.getBoundingClientRect().height < 20;
+  });
+  await expect.poll(folded).toBe(true);
+  await page.reload();
+  await tab(page, 'הגדרות');
+  await expect(page.getByRole('button', { name: 'מראה' })).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(folded).toBe(true);
+  await page.getByRole('button', { name: 'מראה' }).click();
+  await expect.poll(folded).toBe(false);
+
   expect(errors).toEqual([]);
 });
