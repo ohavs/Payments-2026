@@ -53,6 +53,7 @@ adb shell input text "Gym"
 shot widget-5-new-category
 adb shell input keyevent KEYCODE_BACK; sleep 0.5; adb shell input keyevent KEYCODE_BACK
 adb shell cmd uimode night yes
+sleep 3
 open_widget
 tap =7; tap =4
 shot widget-6-dark
