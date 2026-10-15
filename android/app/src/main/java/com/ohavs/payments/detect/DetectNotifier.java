@@ -10,7 +10,7 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
-import com.ohavs.payments.MainActivity;
+import com.ohavs.payments.AppActivity;
 import com.ohavs.payments.R;
 
 import org.json.JSONObject;
@@ -73,7 +73,7 @@ public final class DetectNotifier {
     }
 
     private static PendingIntent activity(Context c, String action, String id, int requestCode) {
-        Intent i = new Intent(c, MainActivity.class)
+        Intent i = new Intent(c, AppActivity.class)
             .setAction("com.ohavs.payments.DETECT_" + action.toUpperCase(java.util.Locale.ROOT))
             .putExtra(EXTRA_ACTION, action)
             .putExtra(EXTRA_ID, id)

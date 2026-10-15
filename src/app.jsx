@@ -24,6 +24,8 @@ import { bindForegroundPush, onPushTap, registerNativePush } from './lib/push.js
 import { App as CapApp } from '@capacitor/app';
 import { checkForUpdateQuietly } from './lib/updater.js';
 import { clearWidget, syncWidget, takeWidgetPending } from './lib/widget.js';
+import { applyPalette } from './lib/palette.js';
+import { validPalette } from './lib/app-icons.js';
 
 // 'system' follows the phone; 'light' / 'dark' are explicit choices.
 function useTheme(pref) {
@@ -70,8 +72,11 @@ function AppInner() {
     if (!isNative) return;
     if (!user) { if (!authLoading) clearWidget(); return; }
     if (!lists.spaces.length) return;
-    syncWidget({ spaces: JSON.parse(widgetSpaces), activeSpaceId: lists.activeListId, currency: settings.defaultCurrency || '₪' });
-  }, [user?.uid, authLoading, widgetSpaces, lists.activeListId, settings.defaultCurrency]);
+    syncWidget({
+      spaces: JSON.parse(widgetSpaces), activeSpaceId: lists.activeListId,
+      currency: settings.defaultCurrency || '₪', palette: validPalette(settings.palette),
+    });
+  }, [user?.uid, authLoading, widgetSpaces, lists.activeListId, settings.defaultCurrency, settings.palette]);
   // Expenses the widget saved without a connection.
   const hasSpaces = lists.spaces.length > 0;
   useEffect(() => {
@@ -127,6 +132,10 @@ function AppInner() {
   const detected = useDetectedSuggestions(isNative && !!user);
 
   useTheme(user ? settings.theme : 'system');
+  // Palette: from the settings once loaded (another phone may have changed it).
+  useEffect(() => {
+    if (user && !settingsLoading && settings.palette) applyPalette(settings.palette);
+  }, [user?.uid, settingsLoading, settings.palette]);
 
   // Android back with no sheet open: other tab → expenses tab → exit app.
   useEffect(() => {
@@ -274,11 +283,11 @@ function AppInner() {
         width: '100%', maxWidth: 480, height: '100vh', position: 'relative',
         // clip, not hidden: nothing (focus, scrollIntoView) can scroll the shell
         // and drag the tab bar or a sheet out of place.
-        background: 'var(--bg)', overflow: 'clip',
+        background: 'var(--bg)', overflow: 'clip',  // .app-bg: the palette's texture
         display: 'flex', flexDirection: 'column',
         // Android draws edge-to-edge: keep content clear of the status bar.
         paddingTop: 'env(safe-area-inset-top)',
-      }} data-screen-label={`tab: ${tab}`}>
+      }} className="app-bg" data-screen-label={`tab: ${tab}`}>
         <main key={tab} className="screen-in hide-scroll" style={{
           flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         }}>

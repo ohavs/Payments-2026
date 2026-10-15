@@ -9,13 +9,13 @@ import { isNative } from './platform.js';
 const WidgetBridge = registerPlugin('WidgetBridge');
 const enabled = isNative && !import.meta.env.VITE_USE_EMULATORS;
 
-// spaces: [{ id, name, shared, groups }]
-export async function syncWidget({ spaces, activeSpaceId, currency }) {
+// spaces: [{ id, name, shared, groups }]; palette: the app's colours (Settings > מראה)
+export async function syncWidget({ spaces, activeSpaceId, currency, palette }) {
   const user = firebase.auth().currentUser;
   if (!enabled || !user) return;
   const { apiKey, projectId } = firebase.app().options;
   try {
-    await WidgetBridge.sync({ uid: user.uid, refreshToken: user.refreshToken, apiKey, projectId, currency, activeSpaceId, spaces });
+    await WidgetBridge.sync({ uid: user.uid, refreshToken: user.refreshToken, apiKey, projectId, currency, palette, activeSpaceId, spaces });
   } catch (e) { console.error('widget sync', e); }
 }
 

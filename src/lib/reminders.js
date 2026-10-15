@@ -6,6 +6,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { fmtMoney, resolveService } from '../data.jsx';
 import { occurrencesBetween } from './recurrence.js';
 import { isNative } from './platform.js';
+import { paletteAccent } from './app-icons.js';
 
 export const REMINDER_CHANNEL = 'payment-reminders';
 const TIMING_DAYS = { week: 7, three: 3, day: 1, same: 0 };
@@ -101,7 +102,7 @@ export function syncReminders(subs, settings) {
         notifications: plan.map((r) => ({
           id: r.id, title: r.title, body: r.body,
           schedule: { at: r.at, allowWhileIdle: true },
-          channelId: REMINDER_CHANNEL, smallIcon: 'ic_stat_notify', iconColor: '#22A45D',
+          channelId: REMINDER_CHANNEL, smallIcon: 'ic_stat_notify', iconColor: paletteAccent(settings.palette),
           extra: { tab: 'subs', subId: r.subId },
         })),
       });
@@ -116,7 +117,7 @@ export async function sendNativeTestNotification() {
     notifications: [{
       id: 1, title: 'בדיקת התראות', body: 'מצוין! התזכורות יגיעו גם כשהאפליקציה סגורה.',
       schedule: { at: new Date(Date.now() + 1500), allowWhileIdle: true },
-      channelId: REMINDER_CHANNEL, smallIcon: 'ic_stat_notify', iconColor: '#22A45D',
+      channelId: REMINDER_CHANNEL, smallIcon: 'ic_stat_notify', iconColor: paletteAccent(document.documentElement.dataset.palette),
     }],
   });
 }

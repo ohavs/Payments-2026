@@ -100,7 +100,7 @@ public class CategoryListService extends RemoteViewsService {
                 v.setViewVisibility(R.id.letter, View.VISIBLE);
             }
             boolean on = name.equals(selected);
-            v.setInt(R.id.row, "setBackgroundResource", on ? R.drawable.widget_row_selected : R.drawable.widget_row);
+            v.setInt(R.id.row, "setBackgroundResource", on ? WidgetTheme.selected(c) : R.drawable.widget_row);
             v.setOnClickFillInIntent(R.id.row, new Intent().putExtra(QuickAddWidget.EXTRA_CATEGORY, name));
             return v;
         }

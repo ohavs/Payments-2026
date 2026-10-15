@@ -169,7 +169,7 @@ public class CategorySheetActivity extends AppCompatActivity {
             View tile = inf.inflate(R.layout.widget_sheet_tile, grid, false);
             ((TextView) tile.findViewById(R.id.name)).setText(g);
             badge(tile.findViewById(R.id.tint), tile.findViewById(R.id.sticker), tile.findViewById(R.id.letter), g);
-            tile.setBackgroundResource(g.equals(selected) ? R.drawable.widget_row_selected : R.drawable.widget_row);
+            tile.setBackgroundResource(g.equals(selected) ? WidgetTheme.selected(this) : R.drawable.widget_row);
             tile.setOnClickListener(v -> pick(g));
             grid.addView(tile);
         }
@@ -281,7 +281,7 @@ public class CategorySheetActivity extends AppCompatActivity {
         add.setVisibility(show ? View.VISIBLE : View.GONE);
         boolean ready = !n.isEmpty() && !busy;
         add.setEnabled(ready);
-        add.setBackgroundResource(ready ? R.drawable.widget_btn_primary : R.drawable.widget_btn_disabled);
+        add.setBackgroundResource(ready ? WidgetTheme.primary(this) : R.drawable.widget_btn_disabled);
         add.setTextColor(getColor(ready ? R.color.w_accent_fg : R.color.w_ink_dim));
         add.setText(busy ? "שומר…" : hasAmount() ? "הוסף ושמור · " + amountLabel() : "הוסף");
     }

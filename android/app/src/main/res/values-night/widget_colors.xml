@@ -19,4 +19,13 @@
     <color name="w_sky">#242D40</color>
     <color name="w_butter">#38301A</color>
     <color name="w_rose">#3A2527</color>
+    <!-- Palettes (Settings > מראה): accent and accent-soft; green is w_accent. -->
+    <color name="w_accent_violet">#9B83FF</color>
+    <color name="w_accent_soft_violet">#2F2B42</color>
+    <color name="w_accent_coral">#FF8A5B</color>
+    <color name="w_accent_soft_coral">#3F2C28</color>
+    <color name="w_accent_ocean">#5C9DFF</color>
+    <color name="w_accent_soft_ocean">#252F42</color>
+    <color name="w_accent_honey">#F7C431</color>
+    <color name="w_accent_soft_honey">#3D3521</color>
 </resources>

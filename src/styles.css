@@ -70,6 +70,51 @@
   color-scheme: dark;
 }
 
+/* Palettes (Settings > מראה, lib/app-icons.js): the accent family and a
+   texture behind the screens, drawn by .app-bg::before in the accent colour.
+   Green is the default above and has no texture. Each has a launcher icon. */
+:root[data-palette="violet"] { --accent: #8467FF; --accent-ink: #5B3FD9; --accent-soft: #EEEAFF; }
+:root[data-palette="coral"] { --accent: #FF7A45; --accent-ink: #C2410C; --accent-soft: #FFEDE4; }
+:root[data-palette="ocean"] { --accent: #3D8BFF; --accent-ink: #1F5FCC; --accent-soft: #E6F0FF; }
+:root[data-palette="honey"] { --accent: #F5B800; --accent-ink: #8A5A00; --accent-soft: #FFF5D1; }
+:root[data-theme="dark"][data-palette="violet"] { --accent: #9B83FF; --accent-ink: #B8A6FF; --accent-soft: rgba(155, 131, 255, 0.16); }
+:root[data-theme="dark"][data-palette="coral"] { --accent: #FF8A5B; --accent-ink: #FFA47F; --accent-soft: rgba(255, 138, 91, 0.16); }
+:root[data-theme="dark"][data-palette="ocean"] { --accent: #5C9DFF; --accent-ink: #8EBCFF; --accent-soft: rgba(92, 157, 255, 0.16); }
+:root[data-theme="dark"][data-palette="honey"] { --accent: #F7C431; --accent-ink: #F9D46E; --accent-soft: rgba(247, 196, 49, 0.14); }
+
+/* Lilac: a dot grid. */
+:root[data-palette="violet"] {
+  --texture-mask: radial-gradient(circle, #000 1.4px, transparent 1.9px) 0 0 / 18px 18px;
+  --texture-opacity: 0.32;
+}
+/* Sunset: a warm glow from the top and horizon lines at the bottom. */
+:root[data-palette="coral"] {
+  --texture-fill: radial-gradient(120% 55% at 50% -8%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
+    repeating-linear-gradient(to bottom, transparent 0 22px, color-mix(in srgb, var(--accent) 10%, transparent) 22px 25px) bottom / 100% 34% no-repeat;
+}
+/* Sea: waves. */
+:root[data-palette="ocean"] {
+  --texture-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='22'%3E%3Cpath d='M0 11q6-7 12 0t12 0 12 0 12 0' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 48px 22px;
+  --texture-opacity: 0.16;
+}
+/* Honey: honeycomb. */
+:root[data-palette="honey"] {
+  --texture-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='48.5'%3E%3Cpath d='M14 0v8.1L0 16.2v16.1l14 8.1 14-8.1V16.2L14 8.1M14 40.4v8.1' fill='none' stroke='%23000' stroke-width='1.3'/%3E%3C/svg%3E") 0 0 / 28px 48.5px;
+  --texture-opacity: 0.26;
+}
+:root[data-theme="dark"] { --texture-opacity-dark: 0.6; }
+
+.app-bg { isolation: isolate; }
+.app-bg::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--texture-fill, var(--accent));
+  -webkit-mask: var(--texture-mask, none);
+  mask: var(--texture-mask, none);
+  opacity: calc(var(--texture-opacity, 1) * var(--texture-opacity-dark, 1));
+  display: var(--texture-display, none);
+}
+:root[data-palette="violet"], :root[data-palette="coral"], :root[data-palette="ocean"], :root[data-palette="honey"] { --texture-display: block; }
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); }
 body {

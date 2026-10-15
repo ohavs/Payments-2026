@@ -101,6 +101,7 @@ const DEFAULT_SETTINGS = {
   sharedNotif: true,     // push when a partner adds to a shared space
   budgetAlerts: true,    // push at 80% / 100% of the monthly cap
   theme: 'system',
+  palette: 'green',      // accent, texture and launcher icon (lib/app-icons.js)
   language: 'he',
   defaultCurrency: '₪',
   // Budget tool: monthly income + a spending ceiling for tracked expenses.

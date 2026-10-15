@@ -174,7 +174,7 @@ export function CategoryBadge({ name, size = 44, selected = false }) {
 export function CoinLogo({ size = 84, style }) {
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" style={style}>
-      <circle cx="50" cy="50" r="46" fill="#22A45D" stroke={INK} strokeWidth="6" />
+      <circle cx="50" cy="50" r="46" fill="var(--accent)" stroke={INK} strokeWidth="6" />
       <text x="50" y="66" textAnchor="middle" fontSize="48" fontWeight="900" fill={INK}
         fontFamily="'Rubik Variable', Rubik, system-ui, sans-serif">₪</text>
     </svg>

@@ -3,6 +3,10 @@ import './styles.css';
 import ReactDOM from 'react-dom/client';
 import { App } from './app.jsx';
 import { isNative } from './lib/platform.js';
+import { applyPalette, storedPalette } from './lib/palette.js';
+
+// The last palette, before anything paints (settings load later).
+applyPalette(storedPalette());
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 

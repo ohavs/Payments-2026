@@ -16,6 +16,8 @@ import { pinWidget, widgetStatus } from './lib/widget.js';
 import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
+import { PALETTES, iconSvg, validPalette } from './lib/app-icons.js';
+import { applyPalette, launcherIcon, setLauncherIcon } from './lib/palette.js';
 import { TimePickerSheet } from './ui/time-picker.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
@@ -309,6 +311,17 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   const [version, setVersion] = useState(null);
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
+
+  // Palette: colours now, the launcher icon once the user leaves the app.
+  const [iconPending, setIconPending] = useState(false);
+  useEffect(() => { launcherIcon().then((r) => setIconPending(!!r?.pending)); }, []);
+  const pickPalette = async (id) => {
+    haptic('tap');
+    applyPalette(id);
+    update({ palette: id });
+    const r = await setLauncherIcon(id);
+    if (r) setIconPending(!!r.pending);
+  };
   const toast = useToast();
   const [notifPerm, setNotifPerm] = useState(() => (isNative ? 'prompt' : notifPermission()));
   useEffect(() => { if (isNative) nativeNotifPermission().then(setNotifPerm).catch(() => {}); }, []);
@@ -562,6 +575,14 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
           <Segmented
             options={[{ id: 'system', label: 'אוטומטי' }, { id: 'light', label: 'בהיר' }, { id: 'dark', label: 'כהה' }]}
             value={settings.theme || 'system'} onChange={(v) => update({ theme: v })} />
+          <PalettePicker value={validPalette(settings.palette)} onChange={pickPalette} />
+          {isNative && (
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 10, lineHeight: 1.45 }}>
+              {iconPending
+                ? 'סמל האפליקציה יתחלף כשתצאו ממנה. אם הוא היה במסך הבית, ייתכן שתצטרכו לגרור אותו שוב מרשימת האפליקציות'
+                : 'הצבע, הרקע וסמל האפליקציה בטלפון'}
+            </div>
+          )}
         </div>
       </SettingsGroup>
 
@@ -585,6 +606,29 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
       <TimePickerSheet open={timeOpen} onClose={() => setTimeOpen(false)} title="שעת התזכורת"
         value={settings.notifTime || '09:00'} onSave={(v) => update({ notifTime: v })} />
+    </div>
+  );
+}
+
+// The palettes as their launcher icons; the chosen one outlined in ink.
+function PalettePicker({ value, onChange }) {
+  return (
+    <div role="radiogroup" aria-label="צבע האפליקציה" style={{ display: 'flex', gap: 6, marginTop: 14, justifyContent: 'space-between' }}>
+      {PALETTES.map((p) => {
+        const on = p.id === value;
+        return (
+          <button key={p.id} role="radio" aria-checked={on} onClick={() => !on && onChange(p.id)} className="press" style={{
+            flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            padding: '8px 2px 7px', borderRadius: 16, cursor: 'pointer', fontFamily: 'inherit',
+            background: on ? 'var(--surface-2)' : 'transparent',
+            border: `2px solid ${on ? 'var(--ink)' : 'transparent'}`, color: 'var(--ink)',
+          }}>
+            <span aria-hidden="true" style={{ width: 48, height: 48, borderRadius: 14, overflow: 'hidden', display: 'block', boxShadow: '0 2px 6px rgba(0,0,0,.18)' }}
+              dangerouslySetInnerHTML={{ __html: iconSvg(p.id, { size: 48 }) }} />
+            <span style={{ fontSize: 12.5, fontWeight: on ? 800 : 600 }}>{p.name}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
