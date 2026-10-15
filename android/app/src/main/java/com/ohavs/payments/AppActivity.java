@@ -9,9 +9,9 @@ import com.ohavs.payments.detect.PaymentDetectPlugin;
 import com.ohavs.payments.widget.WidgetBridgePlugin;
 
 /**
- * The app. Launchers start it through an activity-alias, one per palette
- * icon (AndroidManifest.xml); ".MainActivity", the green one, keeps the name
- * of the activity that used to be here so existing home screen icons stay.
+ * The app. Launchers start it through an activity-alias (AndroidManifest.xml);
+ * ".MainActivity", the green one, keeps the name of the activity that used to
+ * be here so existing home screen icons stay.
  */
 public class AppActivity extends BridgeActivity {
     // This screen opened another one (sign-in, share, installer, settings)
@@ -24,8 +24,10 @@ public class AppActivity extends BridgeActivity {
         registerPlugin(PaymentDetectPlugin.class);
         registerPlugin(GmailTokenPlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
-        registerPlugin(AppIconPlugin.class);
         super.onCreate(savedInstanceState);
+        // Icons per palette were dropped: a phone that did switch goes back
+        // to the green one, once the user leaves the app.
+        AppIcons.request(this, "green");
     }
 
     @Override

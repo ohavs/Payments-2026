@@ -17,7 +17,7 @@ import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
 import { PALETTES, iconSvg, validPalette } from './lib/app-icons.js';
-import { applyLauncherIconNow, applyPalette, launcherIcon, setLauncherIcon } from './lib/palette.js';
+import { applyPalette } from './lib/palette.js';
 import { TimePickerSheet } from './ui/time-picker.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
@@ -312,22 +312,10 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   useEffect(() => { appVersion().then(setVersion); }, []);
   const update = (patch) => setSettings({ ...settings, ...patch });
 
-  // Palette: colours now, the launcher icon once the user leaves the app.
-  // icon: what the phone shows ({ current, pending, error }), native only.
-  const [icon, setIcon] = useState(null);
-  useEffect(() => {
-    const check = () => launcherIcon().then(setIcon);
-    check();
-    if (!isNative) return undefined;
-    const h = CapApp.addListener('resume', check);
-    return () => { h.then((x) => x.remove()); };
-  }, []);
-  const pickPalette = async (id) => {
+  const pickPalette = (id) => {
     haptic('tap');
     applyPalette(id);
     update({ palette: id });
-    const r = await setLauncherIcon(id);
-    if (r) setIcon(r);
   };
   const toast = useToast();
   const [notifPerm, setNotifPerm] = useState(() => (isNative ? 'prompt' : notifPermission()));
@@ -583,7 +571,6 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
             options={[{ id: 'system', label: 'אוטומטי' }, { id: 'light', label: 'בהיר' }, { id: 'dark', label: 'כהה' }]}
             value={settings.theme || 'system'} onChange={(v) => update({ theme: v })} />
           <PalettePicker value={validPalette(settings.palette)} onChange={pickPalette} />
-          {icon && <LauncherIconStatus icon={icon} selected={validPalette(settings.palette)} />}
         </div>
       </SettingsGroup>
 
@@ -611,32 +598,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   );
 }
 
-// Android: which icon the phone shows, and a way to switch it now when it
-// isn't the chosen palette's (waiting for the user to leave, or never asked).
-function LauncherIconStatus({ icon, selected }) {
-  const name = (id) => PALETTES.find((p) => p.id === id)?.name || id;
-  const pending = !!icon.pending;
-  const off = !pending && icon.current !== selected;
-  const text = pending
-    ? `הסמל יתחלף ל"${name(icon.pending)}" כשתצאו מהאפליקציה. אם הוא היה במסך הבית, ייתכן שתצטרכו לגרור אותו שוב מרשימת האפליקציות`
-    : `סמל האפליקציה בטלפון: ${name(icon.current)}`;
-  return (
-    <div style={{ marginTop: 10 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', lineHeight: 1.45 }}>{text}</div>
-      {icon.error && (
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)', marginTop: 4, direction: 'ltr', textAlign: 'right' }}>{icon.error}</div>
-      )}
-      {(pending || off) && (
-        <button onClick={() => { haptic('tap'); applyLauncherIconNow(pending ? null : selected); }} className="press" style={{
-          marginTop: 10, padding: '9px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-        }}>{pending ? 'להחליף את הסמל עכשיו' : `להחליף את הסמל ל"${name(selected)}"`}</button>
-      )}
-    </div>
-  );
-}
-
-// The palettes as their launcher icons; the chosen one outlined in ink.
+// The palettes as swatches in their icon's look; the chosen one outlined in ink.
 function PalettePicker({ value, onChange }) {
   return (
     <div role="radiogroup" aria-label="צבע האפליקציה" style={{ display: 'flex', gap: 6, marginTop: 14, justifyContent: 'space-between' }}>

@@ -7,9 +7,11 @@ import android.content.pm.PackageManager;
 
 /**
  * The launcher icon: one activity-alias per palette, exactly one enabled.
- * The app asks for an icon (pending) and it is switched when the user leaves
- * the app (AppActivity), since the system closes activities opened through
- * the alias that gets disabled.
+ * Icons per palette were dropped (the switch didn't take on every phone);
+ * the aliases stay so a phone that did switch can go back to green. The app
+ * asks for it (pending) and it is switched when the user leaves the app
+ * (AppActivity), since the system closes activities opened through the alias
+ * that gets disabled.
  */
 public final class AppIcons {
     static final String[] NAMES = {"green", "violet", "coral", "ocean", "honey"};
@@ -69,16 +71,9 @@ public final class AppIcons {
                     ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED : PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
                     PackageManager.DONT_KILL_APP);
             }
-            prefs(c).edit().remove("error").apply();
         } catch (RuntimeException e) {
-            // Kept for Settings, which shows it.
             android.util.Log.w("AppIcons", "icon switch failed", e);
-            prefs(c).edit().putString("error", e.getClass().getSimpleName() + ": " + e.getMessage()).apply();
         }
-    }
-
-    static String error(Context c) {
-        return prefs(c).getString("error", "");
     }
 
     private static SharedPreferences prefs(Context c) {

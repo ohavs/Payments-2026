@@ -127,40 +127,10 @@ jobs:
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Widget screenshots for $GITHUB_SHA"
           git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-shots
 
-  # The launcher icon switch on a recent Android (phones run newer than the
-  # smoke emulator).
-  icon:
-    needs: apk
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
-        with:
-          pattern: payments-*
-          merge-multiple: true
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          disable-animations: true
-          script: adb install -r payments.apk && bash scripts/icon-switch.sh icon-36
-      - uses: actions/upload-artifact@v5
-        if: always()
-        with:
-          name: icon-36
-          path: icon-36-*.png
-
   # Publish only after the APK booted on the emulator, and only from the served
   # branch. The app's "check for updates" reads the latest release.
   release:
-    needs: [apk, smoke, icon]
+    needs: [apk, smoke]
     if: github.ref_name == 'claude/implement-payments-page-G9fij'
     runs-on: ubuntu-latest
     steps:

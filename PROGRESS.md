@@ -90,7 +90,7 @@
   - v2.0.69 בטלפון (Samsung): הסמל לא התחלף. כנראה `onUserLeaveHint` לא מגיע ביציאה בהחלקה. תוקן: ההחלפה גם ב־`onStop`, חוץ ממצב שבו האפליקציה פתחה מסך אחר שחוזרים ממנו (`startActivityForResult`/`startIntentSenderForResult` מסמנים). כפתור "להחליף את הסמל עכשיו" (`applyNow`: `moveTaskToBack` ואז החלפה)
   - CI: `widget-shots.sh` כותב pending ל־prefs, יוצא עם HOME, בודק שה־launcher entry הוא `.IconViolet`, פותח דרכו ומצלם את רשימת האפליקציות, וחוזר לירוק
   - v2.0.72 בטלפון: הסמל עדיין לא התחלף. v2.0.77: הגדרות ← מראה מציגות איזה סמל פעיל בטלפון, כפתור החלפה כשהוא שונה מהערכה, וסיבת כישלון אם יש. בדיקת CI על Android 16 (`scripts/icon-switch.sh`, job `icon`): בית + כיבוי מסך
-  - טרם אומת בטלפון האמיתי. הצעד הבא: לפי מה שההגדרות מציגות בטלפון (איזה סמל / שגיאה)
+  - v2.0.77 בטלפון (Samsung): עדיין לא מתחלף. **החלטת המשתמש: לוותר על החלפת הסמל.** הוסר: `AppIconPlugin`, הממשק בהגדרות, הקריאות ב־`palette.js`. נשאר: ה־aliases ו־`AppIcons`, כדי שטלפון שכן הוחלף יחזור לירוק (`AppActivity.onCreate` מבקש green, מוחל ביציאה). CI: `icon-switch.sh` בודק את החזרה לירוק (בית + כיבוי מסך) ב־job ה־smoke; job ה־icon על Android 16 הוסר
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
 

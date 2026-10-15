@@ -17,9 +17,10 @@
             android:launchMode="singleTask"
             android:exported="false" />
 
-        <!-- Launcher icons, one per palette (Settings > מראה); AppIcons keeps
-             exactly one enabled. ".MainActivity" is the green default and the
-             name the activity had before, so home screen icons survive updates. -->
+        <!-- Launcher icons, one per palette; AppIcons keeps exactly one enabled.
+             Only the green ".MainActivity" is used now (the name the activity
+             had before, so home screen icons survive updates); the others stay
+             so phones that had switched can go back. -->
         <activity-alias
             android:name=".MainActivity"
             android:enabled="true"
