@@ -53,7 +53,7 @@
 - [x] בונה שירות מותאם אישית בסגנון החדש. ניהול מרחבים כבר קרוב לסגנון החדש
 - [x] תזכורות למנויים משותפים בצד השרת (`paymentReminders`, ראו שלב 3 צד שרת)
 - [x] ייצוא CSV: הגדרות ← "ייצוא הוצאות" (`src/lib/export.js`). אנדרואיד: Filesystem + Share. שם קובץ ASCII (שם עברי נזרק בדפדפן)
-- [ ] מעבר ל־Firebase modular SDK (החבילה היום ~330KB gzip, בעיקר compat)
+- [x] ~~מעבר ל־Firebase modular SDK~~: נמדד (2026-10-15) 216KB→187KB gzip לחלק של Firebase, חיסכון ~29KB מתוך ~350KB (8%). לא שווה את הסיכון לכניסת Google/התראות שלא נבדקות ב־CI. לחזור לזה רק אם הפתיחה איטית בטלפון
 - [x] שלב 3 (צד שרת): `functions/index.js` נפרס מה־CI (`deploy.yml`, אחרון). Blaze פעיל
   - `onSpaceItemCreated` (europe-west1, ליד Firestore ב־eur3): push לשאר חברי המרחב + התראת תקציב 80%/100% פעם אחת לחודש (`lists/{id}.budgetAlerts.mYYYYMM`)
   - סיכום חודשי (1 לחודש 09:00): רץ בתוך `paymentReminders` השעתית, כי פונקציה מתוזמנת חדשה דורשת הרשאת invoker על שירות Cloud Run שחשבון הפריסה לא יכול לתת. נפרס בהצלחה 2026-10-13
