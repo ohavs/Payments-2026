@@ -27,6 +27,25 @@ public class WidgetLogicTest {
     }
 
     @Test
+    public void widgetSizeGetsKeysThatAreNotStretched() {
+        int small = 0, medium = 1, large = 2, wide = 3;
+        assertEquals(large, QuickAddWidget.layoutFor(360, 380));
+        assertEquals(medium, QuickAddWidget.layoutFor(222, 392));   // 2×3: as it was
+        assertEquals(wide, QuickAddWidget.layoutFor(340, 180));     // 4×2: the keypad beside
+        assertEquals(wide, QuickAddWidget.layoutFor(330, 240));
+        assertEquals(small, QuickAddWidget.layoutFor(180, 200));
+        assertEquals(small, QuickAddWidget.layoutFor(150, 140));
+        // Wide: keys about square, the panel keeps its room.
+        float keypad = QuickAddWidget.keypadWidth(wide, 340, 180);
+        float keyW = (keypad - 10) / 3, keyH = (180 - 24 - 15) / 4f;
+        assertTrue(keyW / keyH <= 1.31f && keyW / keyH > 0.75f);
+        assertTrue(340 - 24 - 10 - keypad >= 120);
+        // Medium narrower than the widget only when the keys would stretch.
+        assertEquals(0, QuickAddWidget.keypadWidth(medium, 222, 392), 0.01);
+        assertTrue(QuickAddWidget.keypadWidth(medium, 300, 260) < 300 - 24);
+    }
+
+    @Test
     public void formatsLikeTheApp() {
         assertEquals("0", AmountInput.format(""));
         assertEquals("1,234.5", AmountInput.format("1234.5"));

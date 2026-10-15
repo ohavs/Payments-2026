@@ -11,16 +11,19 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.ArrayMap;
 import android.util.SizeF;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
-import com.ohavs.payments.MainActivity;
+import com.ohavs.payments.AppActivity;
 import com.ohavs.payments.R;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -154,10 +157,25 @@ public class QuickAddWidget extends AppWidgetProvider {
         if (ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.categories);
     }
 
-    // Layouts by size (dp), smallest first. Android 12+ picks the biggest that
-    // fits by itself as the widget is resized; older launchers ask us.
-    private static final int SMALL = 0, MEDIUM = 1, LARGE = 2;
-    private static final float[][] SIZES = {{150f, 140f}, {200f, 230f}, {290f, 270f}};
+    // Layouts. On Android 12+ each size the launcher reports gets its own,
+    // picked and measured for that size so the keys stay close to square;
+    // older launchers report a min/max size and get the layout for it.
+    private static final int SMALL = 0, MEDIUM = 1, LARGE = 2, WIDE = 3;
+    private static final int[] LAYOUTS = {
+        R.layout.widget_quick_add_small, R.layout.widget_quick_add_medium,
+        R.layout.widget_quick_add, R.layout.widget_quick_add_wide,
+    };
+    // Fallbacks (dp) for a launcher that reports no sizes: the host shows the
+    // closest one that fits, with the XML's default keypad width.
+    private static final float[][] FALLBACK = {{150f, 140f}, {200f, 230f}, {290f, 270f}, {280f, 140f}};
+    // From the XML (dp): height taken by everything but the keypad, the
+    // horizontal padding, the gap between keys, and the wide panel's minimum.
+    private static final float[] CHROME_H = {72f, 128f, 153f, 24f};
+    private static final float[] PAD_W = {20f, 24f, 24f, 24f};
+    private static final float[] GAP = {4f, 5f, 5f, 5f};
+    private static final float WIDE_PANEL = 120f;
+    // Widest a key may get, as a multiple of its height.
+    private static final float MAX_KEY_RATIO = 1.7f, WIDE_KEY_RATIO = 1.3f;
 
     static void render(Context c, AppWidgetManager m, int id) {
         if (!WidgetStore.signedIn(c)) {
@@ -166,39 +184,105 @@ public class QuickAddWidget extends AppWidgetProvider {
             m.updateAppWidget(id, v);
             return;
         }
+        Bundle options = m.getAppWidgetOptions(id);
         if (Build.VERSION.SDK_INT >= 31) {
             Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
-            for (int size = SMALL; size <= LARGE; size++) {
-                bySize.put(new SizeF(SIZES[size][0], SIZES[size][1]), build(c, id, size));
+            for (int l = SMALL; l <= WIDE; l++) {
+                bySize.put(new SizeF(FALLBACK[l][0], FALLBACK[l][1]), build(c, id, l, 0, 0));
+            }
+            for (SizeF s : reportedSizes(options)) {
+                float w = s.getWidth(), h = s.getHeight();
+                // A little under the reported size, so it still fits if the
+                // host measures a dp or two less.
+                bySize.put(new SizeF(Math.max(1f, w - 2f), Math.max(1f, h - 2f)), build(c, id, layoutFor(w, h), w, h));
             }
             m.updateAppWidget(id, new RemoteViews(bySize));
         } else {
-            m.updateAppWidget(id, build(c, id, sizeFor(m.getAppWidgetOptions(id))));
+            // Portrait: the narrowest width and the tallest height.
+            float w = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300);
+            float h = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+            m.updateAppWidget(id, build(c, id, layoutFor(w, h), 0, 0));
         }
     }
 
-    /** Before Android 12: from the size the launcher reports (portrait: min width, max height). */
-    private static int sizeFor(Bundle o) {
-        int w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300);
-        int h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
-        if (w >= SIZES[LARGE][0] && h >= SIZES[LARGE][1]) return LARGE;
-        if (w >= SIZES[MEDIUM][0] && h >= SIZES[MEDIUM][1]) return MEDIUM;
+    /** The sizes the launcher shows the widget at (dp), at most 12. */
+    @SuppressWarnings("deprecation")
+    private static List<SizeF> reportedSizes(Bundle o) {
+        List<SizeF> out = new ArrayList<>();
+        ArrayList<SizeF> sizes = o.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+        if (sizes != null) {
+            for (SizeF s : sizes) {
+                if (s != null && s.getWidth() > 0 && s.getHeight() > 0 && out.size() < 12) out.add(s);
+            }
+        }
+        if (out.isEmpty()) {
+            int minW = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH), maxW = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH);
+            int minH = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT), maxH = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
+            if (minW > 0 && maxH > 0) out.add(new SizeF(minW, maxH));
+            if (maxW > 0 && minH > 0 && (maxW != minW || maxH != minH)) out.add(new SizeF(maxW, minH));
+        }
+        return out;
+    }
+
+    private static float keyH(int layout, float h) {
+        return (h - CHROME_H[layout] - 3 * GAP[layout]) / 4f;
+    }
+
+    /**
+     * The layout for a widget of w×h dp. The large one (with the category
+     * list) when it fits; otherwise the one whose keys come out least
+     * stretched: wide and short gets the keypad beside the rest.
+     */
+    static int layoutFor(float w, float h) {
+        if (w >= FALLBACK[LARGE][0] && h >= FALLBACK[LARGE][1]) return LARGE;
+        float mediumKeyW = (w - PAD_W[MEDIUM] - 2 * GAP[MEDIUM]) / 3f;
+        if (w >= FALLBACK[MEDIUM][0] && h >= FALLBACK[MEDIUM][1] && mediumKeyW <= 2.2f * keyH(MEDIUM, h)) return MEDIUM;
+        float wideKeyW = (w - PAD_W[WIDE] - 10f - WIDE_PANEL - 2 * GAP[WIDE]) / 3f;
+        if (w >= 260f && wideKeyW >= 0.75f * keyH(WIDE, h)) return WIDE;
         return SMALL;
+    }
+
+    /** Keypad width (dp) for a widget of w×h, or 0 to keep the layout's own. */
+    static float keypadWidth(int layout, float w, float h) {
+        float gap = GAP[layout], keyH = keyH(layout, h);
+        switch (layout) {
+            case WIDE: {
+                float room = w - PAD_W[WIDE] - 10f - WIDE_PANEL;
+                float keyW = Math.min((room - 2 * gap) / 3f, WIDE_KEY_RATIO * keyH);
+                return Math.max(3 * keyW + 2 * gap, Math.min(room, 110f));
+            }
+            case LARGE: {
+                float half = (w - PAD_W[LARGE] - 8f) / 2f;
+                float keyW = Math.min((half - 2 * gap) / 3f, MAX_KEY_RATIO * keyH);
+                return Math.max(3 * keyW + 2 * gap, Math.min(half, 120f));
+            }
+            default: {
+                // Small and medium: the keypad spans the width unless that
+                // stretches the keys; then it narrows and centres.
+                float full = w - PAD_W[layout];
+                float keyW = (full - 2 * gap) / 3f;
+                if (keyH <= 0 || keyW <= MAX_KEY_RATIO * keyH) return 0;
+                return 3 * MAX_KEY_RATIO * keyH + 2 * gap;
+            }
+        }
     }
 
     @Override
     public void onAppWidgetOptionsChanged(Context c, AppWidgetManager m, int id, Bundle options) {
-        if (Build.VERSION.SDK_INT < 31) render(c, m, id);
+        render(c, m, id);
     }
 
-    private static RemoteViews build(Context c, int id, int size) {
+    /** The layout for size (SMALL..WIDE); w and h (dp) when known, to fit the keypad. */
+    private static RemoteViews build(Context c, int id, int size, float w, float h) {
         JSONObject s = WidgetStore.state(c, id);
         JSONObject space = WidgetStore.space(c, s.optString("spaceId"));
-        int layout = size == LARGE ? R.layout.widget_quick_add
-            : size == MEDIUM ? R.layout.widget_quick_add_medium : R.layout.widget_quick_add_small;
-        RemoteViews v = new RemoteViews(c.getPackageName(), layout);
+        RemoteViews v = new RemoteViews(c.getPackageName(), LAYOUTS[size]);
         // Anywhere that isn't a key or a button opens the app.
         v.setOnClickPendingIntent(R.id.root, openApp(c));
+        if (Build.VERSION.SDK_INT >= 31 && w > 0 && h > 0) {
+            float keypad = keypadWidth(size, w, h);
+            if (keypad > 0) v.setViewLayoutWidth(R.id.keypad, keypad, TypedValue.COMPLEX_UNIT_DIP);
+        }
 
         String amount = s.optString("amount");
         String status = s.optString("status");
@@ -212,7 +296,7 @@ public class QuickAddWidget extends AppWidgetProvider {
                 : space == null ? "" : "הוצאה חדשה · " + spaceLabel(c, space));
         } else if (amount.isEmpty() && !status.isEmpty()) {
             // Compact sizes: the last save, in short, in place of the empty
-            // amount; the medium save bar has room for the whole of it.
+            // amount; the medium and wide save bars have room for all of it.
             v.setTextViewText(R.id.amount, s.optString("statusShort", status));
         } else {
             v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
@@ -256,16 +340,16 @@ public class QuickAddWidget extends AppWidgetProvider {
                 v.setViewVisibility(R.id.chip_sticker, View.GONE);
                 v.setViewVisibility(R.id.chip_letter, View.VISIBLE);
             }
-            if (size == MEDIUM) v.setTextViewText(R.id.chip_name, none ? "קטגוריה" : category);
+            if (size == MEDIUM || size == WIDE) v.setTextViewText(R.id.chip_name, none ? "קטגוריה" : category);
         }
 
         // Save: enabled once there is an amount and a category.
         boolean ready = value > 0 && !category.isEmpty() && !busy;
-        v.setInt(R.id.save, "setBackgroundResource", ready ? R.drawable.widget_btn_primary : R.drawable.widget_btn_disabled);
+        v.setInt(R.id.save, "setBackgroundResource", ready ? WidgetTheme.primary(c) : R.drawable.widget_btn_disabled);
         v.setTextColor(R.id.save, c.getColor(ready ? R.color.w_accent_fg : R.color.w_ink_dim));
         if (size != SMALL) {
             v.setTextViewText(R.id.save, busy ? "שומר…"
-                : value <= 0 && size == MEDIUM && !status.isEmpty() ? status
+                : value <= 0 && size != LARGE && !status.isEmpty() ? status
                 : value <= 0 ? "הקלידו סכום"
                 : category.isEmpty() ? "בחרו קטגוריה"
                 : "שמור · " + currency(c) + AmountInput.format(amount));
@@ -316,7 +400,7 @@ public class QuickAddWidget extends AppWidgetProvider {
     }
 
     private static PendingIntent openApp(Context c) {
-        Intent i = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Intent i = new Intent(c, AppActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         return PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 }

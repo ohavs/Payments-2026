@@ -85,7 +85,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Categories (scrolls) and the keypad, side by side. -->
+    <!-- The keypad (on the right) and the categories (scroll), side by side. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -94,39 +94,9 @@
         android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:id="@+id/keypad"
+            android:layout_width="150dp"
             android:layout_height="match_parent"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <ListView
-                android:id="@+id/categories"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:divider="@null"
-                android:dividerHeight="0dp"
-                android:listSelector="@android:color/transparent"
-                android:scrollbars="none" />
-
-            <TextView
-                android:id="@+id/new_category"
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/widget_dashed"
-                android:fontFamily="@font/rubik_extrabold"
-                android:gravity="center"
-                android:text="+ קטגוריה חדשה"
-                android:textColor="@color/w_ink"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
             android:layoutDirection="ltr"
             android:orientation="vertical">
             <LinearLayout
@@ -295,6 +265,37 @@
                     android:src="@drawable/ic_w_backspace" />
             </LinearLayout>
         </LinearLayout>
+        <!-- Start margin: the keypad is ltr, so the gap sits on this side. -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <ListView
+                android:id="@+id/categories"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="@null"
+                android:dividerHeight="0dp"
+                android:listSelector="@android:color/transparent"
+                android:scrollbars="none" />
+
+            <TextView
+                android:id="@+id/new_category"
+                android:layout_width="match_parent"
+                android:layout_height="34dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/widget_dashed"
+                android:fontFamily="@font/rubik_extrabold"
+                android:gravity="center"
+                android:text="+ קטגוריה חדשה"
+                android:textColor="@color/w_ink"
+                android:textSize="13sp" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <TextView
