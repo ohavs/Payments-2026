@@ -313,9 +313,10 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   const update = (patch) => setSettings({ ...settings, ...patch });
 
   // Palette: colours now, the launcher icon once the user leaves the app.
-  const [iconPending, setIconPending] = useState(false);
+  // icon: what the phone shows ({ current, pending, error }), native only.
+  const [icon, setIcon] = useState(null);
   useEffect(() => {
-    const check = () => launcherIcon().then((r) => setIconPending(!!r?.pending));
+    const check = () => launcherIcon().then(setIcon);
     check();
     if (!isNative) return undefined;
     const h = CapApp.addListener('resume', check);
@@ -326,7 +327,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
     applyPalette(id);
     update({ palette: id });
     const r = await setLauncherIcon(id);
-    if (r) setIconPending(!!r.pending);
+    if (r) setIcon(r);
   };
   const toast = useToast();
   const [notifPerm, setNotifPerm] = useState(() => (isNative ? 'prompt' : notifPermission()));
@@ -582,19 +583,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
             options={[{ id: 'system', label: 'אוטומטי' }, { id: 'light', label: 'בהיר' }, { id: 'dark', label: 'כהה' }]}
             value={settings.theme || 'system'} onChange={(v) => update({ theme: v })} />
           <PalettePicker value={validPalette(settings.palette)} onChange={pickPalette} />
-          {isNative && (
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 10, lineHeight: 1.45 }}>
-              {iconPending
-                ? 'סמל האפליקציה יתחלף כשתצאו ממנה. אם הוא היה במסך הבית, ייתכן שתצטרכו לגרור אותו שוב מרשימת האפליקציות'
-                : 'הצבע, הרקע וסמל האפליקציה בטלפון'}
-            </div>
-          )}
-          {isNative && iconPending && (
-            <button onClick={() => { haptic('tap'); applyLauncherIconNow(); }} className="press" style={{
-              marginTop: 10, padding: '9px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-            }}>להחליף את הסמל עכשיו</button>
-          )}
+          {icon && <LauncherIconStatus icon={icon} selected={validPalette(settings.palette)} />}
         </div>
       </SettingsGroup>
 
@@ -618,6 +607,31 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
       <TimePickerSheet open={timeOpen} onClose={() => setTimeOpen(false)} title="שעת התזכורת"
         value={settings.notifTime || '09:00'} onSave={(v) => update({ notifTime: v })} />
+    </div>
+  );
+}
+
+// Android: which icon the phone shows, and a way to switch it now when it
+// isn't the chosen palette's (waiting for the user to leave, or never asked).
+function LauncherIconStatus({ icon, selected }) {
+  const name = (id) => PALETTES.find((p) => p.id === id)?.name || id;
+  const pending = !!icon.pending;
+  const off = !pending && icon.current !== selected;
+  const text = pending
+    ? `הסמל יתחלף ל"${name(icon.pending)}" כשתצאו מהאפליקציה. אם הוא היה במסך הבית, ייתכן שתצטרכו לגרור אותו שוב מרשימת האפליקציות`
+    : `סמל האפליקציה בטלפון: ${name(icon.current)}`;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', lineHeight: 1.45 }}>{text}</div>
+      {icon.error && (
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)', marginTop: 4, direction: 'ltr', textAlign: 'right' }}>{icon.error}</div>
+      )}
+      {(pending || off) && (
+        <button onClick={() => { haptic('tap'); applyLauncherIconNow(pending ? null : selected); }} className="press" style={{
+          marginTop: 10, padding: '9px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
+          background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
+        }}>{pending ? 'להחליף את הסמל עכשיו' : `להחליף את הסמל ל"${name(selected)}"`}</button>
+      )}
     </div>
   );
 }

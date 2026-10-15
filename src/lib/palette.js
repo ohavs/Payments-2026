@@ -23,16 +23,16 @@ export function applyPalette(id) {
 }
 
 // Android: the launcher icon follows, once the user leaves the app (switching
-// it closes the app's screen). Returns { current, pending } or null.
+// it closes the app's screen). Returns { current, pending, error } or null.
 export async function setLauncherIcon(id) {
   if (!isNative) return null;
   try { return await AppIcon.set({ name: validPalette(id) }); } catch (e) { return null; }
 }
 
-// Switches now: the app goes to the background and the new icon appears.
-export async function applyLauncherIconNow() {
+// Switches now (to id, if given): the app goes to the background and the new icon appears.
+export async function applyLauncherIconNow(id) {
   if (!isNative) return;
-  try { await AppIcon.applyNow(); } catch (e) { /* older app */ }
+  try { await AppIcon.applyNow(id ? { name: validPalette(id) } : {}); } catch (e) { /* older app */ }
 }
 
 export async function launcherIcon() {

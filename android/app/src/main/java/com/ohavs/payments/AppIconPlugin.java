@@ -17,6 +17,7 @@ public class AppIconPlugin extends Plugin {
         JSObject r = new JSObject();
         r.put("current", AppIcons.current(getContext()));
         r.put("pending", AppIcons.pending(getContext()));
+        r.put("error", AppIcons.error(getContext()));
         call.resolve(r);
     }
 
@@ -31,9 +32,14 @@ public class AppIconPlugin extends Plugin {
         get(call);
     }
 
-    /** Switches now: the app goes to the background first, since the switch closes its screen. */
+    /**
+     * Switches now (to name, if given): the app goes to the background
+     * first, since the switch closes its screen.
+     */
     @PluginMethod
     public void applyNow(PluginCall call) {
+        String name = call.getString("name", "");
+        if (AppIcons.valid(name)) AppIcons.request(getContext(), name);
         call.resolve();
         if (AppIcons.pending(getContext()).isEmpty()) return;
         getActivity().runOnUiThread(() -> {
