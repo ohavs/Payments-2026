@@ -27,7 +27,7 @@
             <TextView
                 android:id="@+id/amount"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
                 android:ellipsize="end"
                 android:fontFamily="@font/rubik_extrabold"
                 android:gravity="start"
@@ -36,6 +36,9 @@
                 android:text="₪45"
                 android:textColor="@color/w_ink"
                 android:textDirection="ltr"
+                android:autoSizeMaxTextSize="32sp"
+                android:autoSizeMinTextSize="16sp"
+                android:autoSizeTextType="uniform"
                 android:textSize="32sp" />
 
             <TextView

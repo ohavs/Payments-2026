@@ -13,6 +13,7 @@ CONFIG='{"uid":"ci","refreshToken":"ci-not-a-token","apiKey":"ci","projectId":"s
 B64=$(printf '%s' "$CONFIG" | base64 -w0)
 open_widget() {  # [widthDp heightDp]
   adb shell am force-stop $PKG
+  sleep 2  # let the system drop the killed host before a new one registers
   adb shell am start -W -n $PKG/.widget.WidgetPreviewActivity --es config64 "$B64" --ei widthDp "${1:-360}" --ei heightDp "${2:-380}" >/dev/null
   sleep 3
 }

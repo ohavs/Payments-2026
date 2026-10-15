@@ -11,7 +11,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.ArrayMap;
 import android.util.SizeF;
-import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -173,7 +172,6 @@ public class QuickAddWidget extends AppWidgetProvider {
             m.updateAppWidget(id, v);
             return;
         }
-        android.util.Log.i("QuickAddWidget", "render " + id + " " + WidgetStore.state(c, id));
         if (Build.VERSION.SDK_INT >= 31) {
             Map<SizeF, RemoteViews> bySize = new ArrayMap<>();
             for (int size = SMALL; size <= LARGE; size++) {
@@ -219,9 +217,9 @@ public class QuickAddWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.status, !status.isEmpty() ? status
                 : space == null ? "" : "הוצאה חדשה · " + spaceLabel(c, space));
         } else if (amount.isEmpty() && !status.isEmpty()) {
-            // Compact sizes: the last save shows in place of the empty amount.
+            // Compact sizes: the last save shows in place of the empty amount
+            // (the line shrinks its text to fit).
             v.setTextViewText(R.id.amount, status);
-            v.setTextViewTextSize(R.id.amount, TypedValue.COMPLEX_UNIT_SP, size == MEDIUM ? 15 : 13);
         } else {
             v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
         }
