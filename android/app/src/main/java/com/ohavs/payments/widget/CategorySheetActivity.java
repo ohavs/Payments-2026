@@ -147,7 +147,7 @@ public class CategorySheetActivity extends AppCompatActivity {
                 if (busy || on) return;
                 space = s;
                 if (!groups().contains(selected)) selected = "";
-                saveState(selected, null);
+                saveState(selected, null, 0);
                 showSpace();
             });
             row.addView(pill);
@@ -201,7 +201,7 @@ public class CategorySheetActivity extends AppCompatActivity {
     private void pick(String category) {
         if (busy) return;
         if (!hasAmount()) {
-            saveState(category, null);
+            saveState(category, null, 0);
             refreshWidget();
             finish();
             return;
@@ -239,27 +239,26 @@ public class CategorySheetActivity extends AppCompatActivity {
             return;
         }
         if (saved == null) {
-            saveState(category, null);
+            saveState(category, null, 0);
         } else {
-            saveState("", saved == WidgetSaver.Result.SAVED
-                ? "נשמר ✓ " + QuickAddWidget.currency(this) + AmountInput.format(value) + " · " + category
-                : saved == WidgetSaver.Result.SIGNED_OUT ? "יישמר אחרי כניסה באפליקציה" : "אין חיבור · יישמר כשיחזור ✓");
+            saveState(category, saved, value);
         }
         refreshWidget();
         finish();
     }
 
-    /** status null: just the choice; otherwise saved, so the amount is cleared. */
-    private void saveState(String category, String status) {
+    /** saved null: just the choice; otherwise what saving did, and the amount is cleared. */
+    private void saveState(String category, WidgetSaver.Result saved, double value) {
         try {
             JSONObject s = WidgetStore.state(this, widgetId);
             s.put("spaceId", space.optString("id"));
-            s.put("category", category);
-            if (status == null) {
+            s.put("category", saved == null ? category : "");
+            if (saved == null) {
                 s.remove("status");
+                s.remove("statusShort");
             } else {
                 s.put("amount", "");
-                s.put("status", status);
+                QuickAddWidget.putStatus(this, s, saved, value, category);
             }
             WidgetStore.setState(this, widgetId, s);
         } catch (JSONException ignored) {

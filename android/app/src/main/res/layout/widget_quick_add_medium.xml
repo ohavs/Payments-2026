@@ -282,8 +282,13 @@
         android:background="@drawable/widget_btn_disabled"
         android:fontFamily="@font/rubik_extrabold"
         android:gravity="center"
+        android:maxLines="1"
+        android:paddingHorizontal="12dp"
         android:paddingBottom="4dp"
         android:text="שמור"
         android:textColor="@color/w_ink_dim"
+        android:autoSizeMaxTextSize="15.5sp"
+        android:autoSizeMinTextSize="11sp"
+        android:autoSizeTextType="uniform"
         android:textSize="15.5sp" />
 </LinearLayout>

@@ -113,13 +113,7 @@ public class QuickAddWidget extends AppWidgetProvider {
                 WidgetSaver.Result r = WidgetSaver.saveItem(c, listId, item);
                 JSONObject next = WidgetStore.state(c, id);
                 next.put("busy", false);
-                String label = currency(c) + AmountInput.format(amount) + " · " + category;
-                switch (r) {
-                    case SAVED: next.put("status", "נשמר ✓ " + label); break;
-                    case OFFLINE: next.put("status", "אין חיבור · יישמר כשיחזור ✓"); break;
-                    case SIGNED_OUT: next.put("status", "יישמר אחרי כניסה באפליקציה"); break;
-                    default: next.put("status", "אין גישה למרחב הזה");
-                }
+                putStatus(c, next, r, amount, category);
                 if (r != WidgetSaver.Result.DENIED) {
                     next.put("amount", "");
                     next.put("category", "");
@@ -217,9 +211,9 @@ public class QuickAddWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.status, !status.isEmpty() ? status
                 : space == null ? "" : "הוצאה חדשה · " + spaceLabel(c, space));
         } else if (amount.isEmpty() && !status.isEmpty()) {
-            // Compact sizes: the last save shows in place of the empty amount
-            // (the line shrinks its text to fit).
-            v.setTextViewText(R.id.amount, status);
+            // Compact sizes: the last save, in short, in place of the empty
+            // amount; the medium save bar has room for the whole of it.
+            v.setTextViewText(R.id.amount, s.optString("statusShort", status));
         } else {
             v.setTextViewText(R.id.amount, currency(c) + AmountInput.format(amount));
         }
@@ -271,6 +265,7 @@ public class QuickAddWidget extends AppWidgetProvider {
         v.setTextColor(R.id.save, c.getColor(ready ? R.color.w_accent_fg : R.color.w_ink_dim));
         if (size != SMALL) {
             v.setTextViewText(R.id.save, busy ? "שומר…"
+                : value <= 0 && size == MEDIUM && !status.isEmpty() ? status
                 : value <= 0 ? "הקלידו סכום"
                 : category.isEmpty() ? "בחרו קטגוריה"
                 : "שמור · " + currency(c) + AmountInput.format(amount));
@@ -281,6 +276,17 @@ public class QuickAddWidget extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.save, value > 0 && category.isEmpty()
             ? sheet(c, id, false) : broadcast(c, id, ACTION_SAVE, "save", null));
         return v;
+    }
+
+    /** What a save did, in full (large widget, save bar) and short (compact amount line). */
+    static void putStatus(Context c, JSONObject s, WidgetSaver.Result r, double amount, String category) throws JSONException {
+        String label = currency(c) + AmountInput.format(amount) + " · " + category;
+        switch (r) {
+            case SAVED: s.put("status", "נשמר ✓ " + label).put("statusShort", "נשמר ✓"); break;
+            case OFFLINE: s.put("status", "אין חיבור · יישמר כשיחזור ✓").put("statusShort", "ממתין ✓"); break;
+            case SIGNED_OUT: s.put("status", "יישמר אחרי כניסה באפליקציה").put("statusShort", "ממתין ✓"); break;
+            default: s.put("status", "אין גישה למרחב הזה").put("statusShort", "אין גישה");
+        }
     }
 
     /** The space's label: "אישי" or the shared space's name (from the app, which knows the rest). */

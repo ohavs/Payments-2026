@@ -77,7 +77,7 @@ dump; grep -q '₪28 · על מה?' w.xml || { echo "picker sheet missing"; grep
 shot widget-7-picker
 tap "אוכל בחוץ"
 sleep 4
-dump; grep -q 'יישמר' w.xml || { echo "picking did not save"; grep -o 'text="[^"]*"' w.xml | head -30; exit 1; }
+dump; grep -q 'text="יישמר אחרי כניסה באפליקציה"' w.xml && grep -q 'text="ממתין ✓"' w.xml || { echo "picking did not save"; grep -o 'text="[^"]*"' w.xml | head -30; exit 1; }
 shot widget-8-medium-saved
 
 # Small: numbers first.
