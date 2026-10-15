@@ -17,7 +17,7 @@ import { expensesToCSV, shareCSV } from './lib/export.js';
 import { App as CapApp } from '@capacitor/app';
 import { Segmented } from './ui/kit.jsx';
 import { PALETTES, iconSvg, validPalette } from './lib/app-icons.js';
-import { applyPalette, launcherIcon, setLauncherIcon } from './lib/palette.js';
+import { applyLauncherIconNow, applyPalette, launcherIcon, setLauncherIcon } from './lib/palette.js';
 import { TimePickerSheet } from './ui/time-picker.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
@@ -314,7 +314,13 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
 
   // Palette: colours now, the launcher icon once the user leaves the app.
   const [iconPending, setIconPending] = useState(false);
-  useEffect(() => { launcherIcon().then((r) => setIconPending(!!r?.pending)); }, []);
+  useEffect(() => {
+    const check = () => launcherIcon().then((r) => setIconPending(!!r?.pending));
+    check();
+    if (!isNative) return undefined;
+    const h = CapApp.addListener('resume', check);
+    return () => { h.then((x) => x.remove()); };
+  }, []);
   const pickPalette = async (id) => {
     haptic('tap');
     applyPalette(id);
@@ -582,6 +588,12 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
                 ? 'סמל האפליקציה יתחלף כשתצאו ממנה. אם הוא היה במסך הבית, ייתכן שתצטרכו לגרור אותו שוב מרשימת האפליקציות'
                 : 'הצבע, הרקע וסמל האפליקציה בטלפון'}
             </div>
+          )}
+          {isNative && iconPending && (
+            <button onClick={() => { haptic('tap'); applyLauncherIconNow(); }} className="press" style={{
+              marginTop: 10, padding: '9px 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
+              background: 'var(--ink)', color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
+            }}>להחליף את הסמל עכשיו</button>
           )}
         </div>
       </SettingsGroup>

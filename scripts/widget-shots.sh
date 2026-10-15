@@ -122,3 +122,40 @@ tap =9
 shot widget-11-dark-small
 adb shell cmd uimode night no
 echo "widget screenshots done"
+
+# Launcher icon: a palette's icon (asked for in Settings, kept in the app's
+# prefs) replaces the launcher entry once the user leaves the app.
+launcher() { adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $PKG | tail -1 | tr -d '\r'; }
+ask_icon() {
+  adb shell am force-stop $PKG
+  local dir=/data/data/$PKG/shared_prefs owner
+  owner=$(adb shell stat -c %u:%g /data/data/$PKG | tr -d '\r')
+  printf '<?xml version="1.0" encoding="utf-8" standalone="yes" ?>\n<map>\n    <string name="pending">%s</string>\n</map>\n' "$1" > app_icon.xml
+  adb push app_icon.xml /data/local/tmp/app_icon.xml >/dev/null
+  adb shell "mkdir -p $dir && cp /data/local/tmp/app_icon.xml $dir/app_icon.xml && chown $owner $dir $dir/app_icon.xml && chmod 660 $dir/app_icon.xml && restorecon -R $dir"
+}
+echo "launcher entry before: $(launcher)"
+[ "$(launcher)" = "$PKG/.MainActivity" ] || { echo "the green icon is not the default"; exit 1; }
+ask_icon violet
+adb shell am start -W -n $PKG/.MainActivity >/dev/null
+sleep 6
+adb shell input keyevent KEYCODE_HOME
+sleep 4
+echo "launcher entry after leaving: $(launcher)"
+[ "$(launcher)" = "$PKG/.IconViolet" ] || { echo "icon did not switch"; adb logcat -d | grep -E "AppIcons|AndroidRuntime" | tail -20; exit 1; }
+# The new icon opens the app.
+adb shell am start -W -n $PKG/.IconViolet | grep -q "Status: ok" || { echo "the violet icon does not open the app"; exit 1; }
+sleep 4
+adb shell dumpsys activity activities | grep -qE "$PKG/\.(AppActivity|IconViolet)" || { echo "app not running after the switch"; exit 1; }
+adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell input swipe 540 1900 540 400 300; sleep 3
+shot widget-14-launcher-icon
+adb shell input keyevent KEYCODE_HOME
+# And back to green.
+ask_icon green
+adb shell am start -W -n $PKG/.IconViolet >/dev/null
+sleep 6
+adb shell input keyevent KEYCODE_HOME
+sleep 4
+echo "launcher entry back: $(launcher)"
+[ "$(launcher)" = "$PKG/.MainActivity" ] || { echo "icon did not switch back"; exit 1; }

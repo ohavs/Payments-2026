@@ -29,6 +29,12 @@ export async function setLauncherIcon(id) {
   try { return await AppIcon.set({ name: validPalette(id) }); } catch (e) { return null; }
 }
 
+// Switches now: the app goes to the background and the new icon appears.
+export async function applyLauncherIconNow() {
+  if (!isNative) return;
+  try { await AppIcon.applyNow(); } catch (e) { /* older app */ }
+}
+
 export async function launcherIcon() {
   if (!isNative) return null;
   try { return await AppIcon.get(); } catch (e) { return null; }
