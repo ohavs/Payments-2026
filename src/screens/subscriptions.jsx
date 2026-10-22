@@ -1,10 +1,10 @@
 // Subscriptions tab: monthly total, the next charge, then everything grouped by
-// when it's due. A calendar view shows the month's charges by day.
+// when it's due, paused ones last. A calendar view shows the month's charges by day.
 import React from 'react';
 import { ServiceBubble } from '../components.jsx';
 import {
-  CYCLE_LABEL, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, nextDueISO, parseISODate,
-  resolveService, statusDateISO, totalsByMonthlyEquivalent,
+  CYCLE_LABEL, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, isPaused, nextDueISO, parseISODate,
+  resolveService, statusDateISO, statusLabel, totalsByMonthlyEquivalent,
 } from '../data.jsx';
 import { useExchangeRates } from '../fx.jsx';
 import { useStickyState } from '../lists.jsx';
@@ -25,11 +25,12 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
   const [calendar, setCalendar] = useStickyState('subs.calendar', false);
   const [statsOpen, setStatsOpen] = React.useState(false);
 
-  const monthly = totalsByMonthlyEquivalent(payments, fx?.rates, currency);
+  const active = React.useMemo(() => payments.filter((p) => !isPaused(p)), [payments]);
+  const monthly = totalsByMonthlyEquivalent(active, fx?.rates, currency);
 
   const { next, groups } = React.useMemo(() => {
     const today = new Date();
-    const rows = payments.map((p) => ({ p, paid: isAutoPaid(p), due: nextDueISO(p) }));
+    const rows = active.map((p) => ({ p, paid: isAutoPaid(p), due: nextDueISO(p) }));
     const upcoming = rows.filter((r) => !r.paid).sort((a, b) => a.due.localeCompare(b.due));
     const paid = rows.filter((r) => r.paid).sort((a, b) => statusDateISO(a.p).localeCompare(statusDateISO(b.p)));
     const g = [
@@ -44,9 +45,12 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
     ];
     const used = new Set(g.flatMap((x) => x.rows));
     g.push({ title: 'בהמשך', rows: upcoming.filter((r) => !used.has(r)) });
-    g.push({ title: 'שולם החודש', rows: paid, paid: true });
+    g.push({ title: 'שולם החודש', rows: paid, dim: true });
+    const paused = payments.filter(isPaused).map((p) => ({ p }))
+      .sort((a, b) => statusDateISO(b.p).localeCompare(statusDateISO(a.p)));
+    g.push({ title: 'בהקפאה', rows: paused, dim: true });
     return { next: upcoming[0], groups: g.filter((x) => x.rows.length) };
-  }, [payments]);
+  }, [payments, active]);
 
   return (
     <div style={{ padding: '18px 18px 120px' }}>
@@ -73,7 +77,7 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
             <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--ink-dim)' }}>סה״כ בחודש</div>
             <Money value={monthly} size={48} currency={currency} style={{ marginTop: 6 }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-              <Pill tone="lavender">{payments.length === 1 ? 'מנוי אחד' : `${payments.length} מנויים`}</Pill>
+              <Pill tone="lavender">{active.length === 1 ? 'מנוי אחד' : `${active.length} מנויים`}</Pill>
               <Pill>{fmtMoney(monthly * 12, currency)} בשנה</Pill>
               <Pill onClick={() => setStatsOpen(true)}>
                 פירוט
@@ -122,13 +126,13 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
                         width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
                         border: 'none', borderTop: i ? '1px solid var(--divider)' : 'none', background: 'transparent',
                         cursor: 'pointer', fontFamily: 'inherit', color: 'var(--ink)', textAlign: 'start',
-                        opacity: g.paid ? 0.62 : 1,
+                        opacity: g.dim ? 0.62 : 1,
                       }}>
                         <ServiceBubble service={s} size={44} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 15.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s?.name || 'תשלום'}</div>
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', marginTop: 2 }}>
-                            {g.paid ? `שולם ${fmtRelative(statusDateISO(p))}` : fmtRelative(statusDateISO(p))} · {CYCLE_LABEL[p.cycle]}
+                            {statusLabel(p)} · {CYCLE_LABEL[p.cycle]}
                           </div>
                         </div>
                         <div style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
@@ -144,7 +148,7 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
         </>
       )}
 
-      <StatsDetailSheet open={statsOpen} onClose={() => setStatsOpen(false)} payments={payments} currency={currency} rates={fx?.rates} />
+      <StatsDetailSheet open={statsOpen} onClose={() => setStatsOpen(false)} payments={active} currency={currency} rates={fx?.rates} />
     </div>
   );
 }

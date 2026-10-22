@@ -2,7 +2,7 @@
 // adding and tracking stay front and centre there.
 import React from 'react';
 import { BudgetSettingsSheet, DailyBars, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
-import { fmtMoney } from '../data.jsx';
+import { activeInMonth, fmtMoney } from '../data.jsx';
 import { MONTH_NAMES_HE, isSharedList } from '../lists.jsx';
 import { PayerTotals } from '../spaces.jsx';
 import { CategoryBadge, categoryVisual } from '../ui/icons.jsx';
@@ -31,7 +31,10 @@ function SummaryScreen({ lists, categories, payments, settings, setSettings, onO
   const [payer, setPayer] = React.useState(null);
   const shared = isSharedList(lists.activeList);
   const currency = settings.defaultCurrency || '₪';
-  const subsMonthly = useSubsMonthly(payments, currency);
+  const prevMonth = new Date(view.y, view.m - 1, 1);
+  const subsMonthly = useSubsMonthly(payments, currency, view.y, view.m);
+  const prevSubs = useSubsMonthly(payments, currency, prevMonth.getFullYear(), prevMonth.getMonth());
+  const subsCount = activeInMonth(payments, view.y, view.m).length;
   const args = {
     items: lists.items,
     income: Number(settings.monthlyIncome) || 0,
@@ -39,12 +42,11 @@ function SummaryScreen({ lists, categories, payments, settings, setSettings, onO
     subsMonthly, includeSubs: settings.includeSubsInBudget !== false,
     categories, categoryCaps: settings.categoryCaps || {},
   };
-  const deps = [lists.items, settings, subsMonthly, categories.join('|'), view.y, view.m];
+  const deps = [lists.items, settings, subsMonthly, prevSubs, categories.join('|'), view.y, view.m];
   const stats = React.useMemo(() => computeBudgetStats({ ...args, y: view.y, m: view.m }), deps);
-  const prev = React.useMemo(() => {
-    const p = new Date(view.y, view.m - 1, 1);
-    return computeBudgetStats({ ...args, y: p.getFullYear(), m: p.getMonth() });
-  }, deps);
+  const prev = React.useMemo(
+    () => computeBudgetStats({ ...args, subsMonthly: prevSubs, y: prevMonth.getFullYear(), m: prevMonth.getMonth() }),
+    deps);
 
   const atCurrent = view.y === now.getFullYear() && view.m === now.getMonth();
   const shift = (d) => { haptic('select'); setView((v) => { const x = new Date(v.y, v.m + d, 1); return { y: x.getFullYear(), m: x.getMonth() }; }); };
@@ -113,7 +115,7 @@ function SummaryScreen({ lists, categories, payments, settings, setSettings, onO
             )}
             {subsMonthly > 0 && (
               <button onClick={onOpenSubs} className="press" style={{ border: 'none', padding: 0, background: 'transparent', textAlign: 'inherit', fontFamily: 'inherit', cursor: 'pointer', color: 'inherit' }}>
-                <Tile label="מנויים לחודש" value={money(subsMonthly)} sub={`${payments.length} מנויים`} />
+                <Tile label="מנויים לחודש" value={money(subsMonthly)} sub={subsCount === 1 ? 'מנוי אחד' : `${subsCount} מנויים`} />
               </button>
             )}
           </div>

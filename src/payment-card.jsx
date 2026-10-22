@@ -2,11 +2,12 @@
 // StatsCard (the yellow stats card on home) + ListCard (compact row).
 import { useMemo } from 'react';
 import { Icon, ServiceBubble } from './components.jsx';
-import { CYCLE_LABEL, CYCLE_ORDER, countsPerCycle, fmtMoney, fmtRelative, isAutoPaid, resolveService, statusDateISO, totalsByMonthlyEquivalent } from './data.jsx';
+import { CYCLE_LABEL, CYCLE_ORDER, countsPerCycle, fmtMoney, fmtRelative, isAutoPaid, isPaused, resolveService, statusDateISO, statusLabel, totalsByMonthlyEquivalent } from './data.jsx';
 
 function ListCard({ payment, onClick, accent }) {
   const service = resolveService(payment);
   const paid = isAutoPaid(payment);
+  const paused = isPaused(payment);
 
   const bg = accent ? 'var(--accent)' : 'var(--surface-1)';
   const fg = accent ? 'var(--accent-fg)' : 'var(--ink)';
@@ -17,7 +18,7 @@ function ListCard({ payment, onClick, accent }) {
       width: '100%', display: 'flex', alignItems: 'center', gap: 14,
       padding: 14, borderRadius: 20, border: 'none', cursor: 'pointer',
       background: bg, color: fg, fontFamily: 'inherit', textAlign: 'start',
-      opacity: paid ? .55 : 1,
+      opacity: paid || paused ? .55 : 1,
       transition: 'transform .12s ease',
     }}>
       <ServiceBubble service={service} size={44} dark={!accent} />
@@ -32,7 +33,7 @@ function ListCard({ payment, onClick, accent }) {
           )}
         </div>
         <div style={{ fontSize: 12, color: dim, marginTop: 2, fontWeight: 500 }}>
-          {fmtRelative(statusDateISO(payment))} · {CYCLE_LABEL[payment.cycle]}
+          {paused ? statusLabel(payment) : fmtRelative(statusDateISO(payment))} · {CYCLE_LABEL[payment.cycle]}
         </div>
       </div>
       <div style={{ textAlign: 'end', fontVariantNumeric: 'tabular-nums' }}>

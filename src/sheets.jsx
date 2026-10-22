@@ -1,9 +1,9 @@
 // Detail sheet, Add Service sheet, and Custom Service builder.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Chip, Icon, IconButton, ServiceBubble, Sheet } from './components.jsx';
-import { CATEGORIES, CURRENCIES, CYCLE_LABEL, MONTH_NAMES_LONG, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, nextDueISO, resolveService, statusDateISO, todayLocalISO } from './data.jsx';
+import { CATEGORIES, CURRENCIES, CYCLE_LABEL, MONTH_NAMES_LONG, SERVICE_CATALOG, dayOfMonthFromDate, dayOfWeekFromDate, fmtDateShort, fmtMoney, fmtRelative, isAutoPaid, isPaused, lastDayOfMonth, monthFromDate, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, nextDueISO, resolveService, statusDateISO, statusLabel, todayLocalISO } from './data.jsx';
 import { Spinner, useConfirm, useToast } from './feedback.jsx';
-import { occurrencesBetween } from './lib/recurrence.js';
+import { occurrencesBetween, pausedFrom, resumedFrom } from './lib/recurrence.js';
 import { Segmented } from './ui/kit.jsx';
 
 // ---------- Text field: label + rounded input ----------
@@ -139,7 +139,8 @@ function SubscriptionForm({ value, onChange }) {
         </>
       )}
       <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink-dim)', margin: '12px 2px 0' }}>
-        {cycle === 'daily' ? 'נגבה כל יום' : `החיוב הבא: ${fmtDateShort(nextISO)} · ${fmtRelative(nextISO)}`}
+        {isPaused(value) ? 'בהקפאה, לא יחויב עד שיחודש'
+          : cycle === 'daily' ? 'נגבה כל יום' : `החיוב הבא: ${fmtDateShort(nextISO)} · ${fmtRelative(nextISO)}`}
       </div>
 
       <FieldLabel>הערה</FieldLabel>
@@ -155,7 +156,7 @@ function SubscriptionForm({ value, onChange }) {
 // DetailSheet — edit existing payment. No more "mark as paid" button
 // (paid status is auto-derived from date).
 // =================================================================
-function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom }) {
+function DetailSheet({ payment, open, onClose, onSave, onDelete, onPause, onEditCustom }) {
   const [draft, setDraft] = useState(payment);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
@@ -193,7 +194,8 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
 
   const service = resolveService(draft);
   const isCustom = !!draft.customService;
-  const paid = isAutoPaid(draft);
+  const paused = isPaused(draft);
+  const paid = !paused && isAutoPaid(draft);
   const update = (patch) => setDraft((d) => ({ ...d, ...patch }));
   const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
@@ -204,10 +206,23 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
     setSaving(false);
     onClose();
   };
+  // Paused: nothing is charged from today on, past charges stay. Unsaved edits
+  // are saved along with it.
+  const togglePause = async () => {
+    if (!paused) {
+      const ok = await confirm({
+        title: 'הקפאת מנוי',
+        message: `מהיום "${service?.name || 'המנוי'}" לא ייספר בסכומים ובתקציב, ולא יישלחו עליו תזכורות. החיובים שכבר היו נשארים. אפשר לחדש בכל רגע.`,
+        confirmLabel: 'הקפא',
+      });
+      if (!ok) return;
+    }
+    onPause({ ...draft, pauses: paused ? resumedFrom(draft) : pausedFrom(draft) }, !paused);
+  };
   const requestDelete = async () => {
     const ok = await confirm({
       title: 'מחיקת תשלום',
-      message: `האם למחוק את "${service?.name || 'התשלום'}"? פעולה זו לא ניתנת לביטול.`,
+      message: `האם למחוק את "${service?.name || 'התשלום'}"? גם החיובים שכבר היו יימחקו מהסיכומים, ואי אפשר לבטל. כדי לשמור אותם, אפשר להקפיא את המנוי.`,
       confirmLabel: 'מחק',
       danger: true,
     });
@@ -227,15 +242,16 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8 }}>
               {service?.name || 'תשלום'}
-              {paid && (
+              {(paid || paused) && (
                 <span style={{
                   fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
-                  background: 'var(--accent-soft)', color: 'var(--accent-ink)',
-                }}>שולם אוטומטית</span>
+                  background: paused ? 'var(--surface-3)' : 'var(--accent-soft)',
+                  color: paused ? 'var(--ink-dim)' : 'var(--accent-ink)',
+                }}>{paused ? 'בהקפאה' : 'שולם אוטומטית'}</span>
               )}
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginTop: 2 }}>
-              {CYCLE_LABEL[draft.cycle]} · {fmtRelative(statusDateISO(draft))}
+              {CYCLE_LABEL[draft.cycle]} · {paused ? statusLabel(draft) : fmtRelative(statusDateISO(draft))}
             </div>
           </div>
         </div>
@@ -256,9 +272,22 @@ function DetailSheet({ payment, open, onClose, onSave, onDelete, onEditCustom })
 
       <SubscriptionForm key={draft.id} value={draft} onChange={update} />
 
-      {/* Delete */}
+      {/* Pause / resume, then delete */}
       <div style={{ padding: '16px 22px 0' }}>
+        <button onClick={togglePause} className="press" style={{
+          width: '100%', padding: '13px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
+          background: 'var(--surface-2)', color: 'var(--ink)',
+          fontFamily: 'inherit', fontWeight: 700, fontSize: 14.5,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}>
+          <Icon name={paused ? 'play' : 'pause'} size={16} />
+          {paused ? 'חידוש המנוי' : 'הקפאת המנוי'}
+        </button>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-dim)', textAlign: 'center', margin: '7px 8px 0' }}>
+          {paused ? 'מהיום הוא ייספר שוב. החודשים בהקפאה לא ייספרו' : 'לא נספר מהיום, החיובים הקודמים נשארים'}
+        </div>
         <button onClick={requestDelete} style={{
+          marginTop: 6,
           width: '100%', padding: '12px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
           background: 'transparent', color: 'var(--danger)',
           fontFamily: 'inherit', fontWeight: 700, fontSize: 14,

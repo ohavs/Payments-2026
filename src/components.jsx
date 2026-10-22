@@ -58,6 +58,8 @@ function Icon({ name, size = 20, color = 'currentColor', strokeWidth = 2 }) {
     case 'check': return (<svg {...base} viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>);
     case 'edit': return (<svg {...base} viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>);
     case 'trash': return (<svg {...base} viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/></svg>);
+    case 'pause': return (<svg {...base} viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>);
+    case 'play': return (<svg {...base} viewBox="0 0 24 24"><path d="M7 4.8v14.4L19 12z"/></svg>);
     case 'close': return (<svg {...base} viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>);
     case 'arrow-up-right': return (<svg {...base} viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>);
     case 'arrow-left': return (<svg {...base} viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>);

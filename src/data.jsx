@@ -1,7 +1,7 @@
 // Catalog of popular Israeli services for the "add" picker.
 // Each entry: id, name (Hebrew), category, defaultPrice (NIS), defaultCycle, brand color, glyph
 import { convertCurrency } from './fx.jsx';
-import { isPaidThisCycle, lastOccurrenceBefore, nextOccurrence, occurrencesBetween, toISO } from './lib/recurrence.js';
+import { isPaidThisCycle, isPaused, lastOccurrenceBefore, nextOccurrence, occurrencesBetween, pausedThrough, toISO } from './lib/recurrence.js';
 
 const SERVICE_CATALOG = [
   // Streaming
@@ -121,13 +121,30 @@ function nextDueISO(payment) {
 }
 
 // The date a payment row shows: when it was charged if already paid this month,
-// otherwise when it is due next.
+// otherwise when it is due next. A paused payment shows when it was paused.
 function statusDateISO(payment) {
+  if (isPaused(payment)) return pausedSinceISO(payment);
   if (isAutoPaid(payment)) {
     const last = lastOccurrenceBefore(payment);
     if (last) return toISO(last);
   }
   return nextDueISO(payment);
+}
+
+function pausedSinceISO(payment) {
+  return (payment.pauses || []).find((x) => x.from && !x.to)?.from || null;
+}
+
+// The status line of a payment row: "paused 3 days ago", "paid yesterday", "in 5 days".
+function statusLabel(payment) {
+  if (isPaused(payment)) return `בהקפאה מ־${fmtDateShort(pausedSinceISO(payment))}`;
+  const rel = fmtRelative(statusDateISO(payment));
+  return isAutoPaid(payment) ? `שולם ${rel}` : rel;
+}
+
+// Payments that count in a month: everything except those paused all month.
+function activeInMonth(payments, y, m) {
+  return payments.filter((p) => !pausedThrough(p, new Date(y, m, 1), new Date(y, m + 1, 0)));
 }
 
 // Sum of charges this calendar month on or before today.
@@ -284,4 +301,4 @@ function countsPerCycle(payments) {
   return c;
 }
 
-export { nextDueISO, statusDateISO, ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, countsPerCycle, dayOfMonthFromDate, dayOfWeekFromDate, daysUntil, fmtDateShort, fmtLocalISO, fmtMoney, fmtRelative, getService, isAutoPaid, lastDayOfMonth, monthFromDate, monthlyEquivalent, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, paidThisMonth, parseISODate, plannedThisMonth, priceIn, resolveService, seedPayments, todayLocalISO, totalsByMonthlyEquivalent, totalsPerCycle };
+export { activeInMonth, isPaused, nextDueISO, statusDateISO, statusLabel, ACCENT_PALETTE, CATEGORIES, CURRENCIES, CYCLE_LABEL, CYCLE_ORDER, CYCLE_PER_MONTH, MONTH_NAMES_LONG, MONTH_NAMES_SHORT, SERVICE_CATALOG, countsPerCycle, dayOfMonthFromDate, dayOfWeekFromDate, daysUntil, fmtDateShort, fmtLocalISO, fmtMoney, fmtRelative, getService, isAutoPaid, lastDayOfMonth, monthFromDate, monthlyEquivalent, nextDateForDayOfMonth, nextDateForDayOfWeek, nextDateForMonthDay, paidThisMonth, parseISODate, plannedThisMonth, priceIn, resolveService, seedPayments, todayLocalISO, totalsByMonthlyEquivalent, totalsPerCycle };

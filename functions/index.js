@@ -177,7 +177,7 @@ exports.onSpaceItemCreated = onDocumentCreated(
     }
     if (!(cap > 0)) return;
     const items = await listRef.collection('items').where('date', '>=', month.from).where('date', '<=', month.to).get();
-    const used = lib.sumAmounts(items.docs.map((d) => d.data())) + lib.subsMonthly(subs);
+    const used = lib.sumAmounts(items.docs.map((d) => d.data())) + lib.subsMonthly(subs, month);
     const field = `budgetAlerts.m${month.key.replace('-', '')}`;
     const threshold = await db.runTransaction(async (tx) => {
       const fresh = (await tx.get(listRef)).data() || {};
@@ -213,12 +213,12 @@ async function sendMonthlySummaries() {
       if (!personal) continue;
       const sumIn = async (r) => lib.sumAmounts((await personal.ref.collection('items')
         .where('date', '>=', r.from).where('date', '<=', r.to).get()).docs.map((d) => d.data()));
-      const subs = s.includeSubsInBudget !== false
-        ? lib.subsMonthly((await userRef.collection('payments').get()).docs.map((d) => d.data())) : 0;
       const spent = await sumIn(a);
       if (spent <= 0) continue;
       const prevSpent = await sumIn(b);
-      const msg = lib.summaryMessage(last.getMonth(), spent + subs, prevSpent > 0 ? prevSpent + subs : 0);
+      const subs = s.includeSubsInBudget !== false ? (await userRef.collection('payments').get()).docs.map((d) => d.data()) : [];
+      const msg = lib.summaryMessage(last.getMonth(), spent + lib.subsMonthly(subs, a),
+        prevSpent > 0 ? prevSpent + lib.subsMonthly(subs, b) : 0);
       sent += await sendToUser(uid, { ...msg, channel: 'monthly-summary', data: { tab: 'summary' } });
     } catch (err) {
       logger.error(`summary failed uid=${userRef.id}`, err);

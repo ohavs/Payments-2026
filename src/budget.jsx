@@ -9,7 +9,7 @@
 // FieldInput, Label, PrimaryButton, Section, ghostBtn) and data.jsx (fmtMoney).
 import React from 'react';
 import { Chip, Icon, IconButton, Sheet, Toggle } from './components.jsx';
-import { fmtMoney, totalsByMonthlyEquivalent } from './data.jsx';
+import { activeInMonth, fmtMoney, totalsByMonthlyEquivalent } from './data.jsx';
 import { useToast } from './feedback.jsx';
 import { useExchangeRates } from './fx.jsx';
 import { FieldInput, PrimaryButton, Section, expenseDate, ghostBtn, useStickyState } from './lists.jsx';
@@ -103,12 +103,15 @@ function computeBudgetStats({ items, y, m, income = 0, cap = 0, subsMonthly = 0,
   };
 }
 
-// Monthly equivalent of all recurring payments, in the user's currency.
-function useSubsMonthly(payments, currency) {
+// Monthly equivalent of the recurring payments that count in a month (default:
+// this one), in the user's currency. A payment paused all month doesn't count.
+function useSubsMonthly(payments, currency, y, m) {
   const fx = useExchangeRates();
+  const now = new Date();
+  const yy = y ?? now.getFullYear(), mm = m ?? now.getMonth();
   return React.useMemo(
-    () => totalsByMonthlyEquivalent(payments || [], fx?.rates, currency || '₪'),
-    [payments, fx?.rates, currency]
+    () => totalsByMonthlyEquivalent(activeInMonth(payments || [], yy, mm), fx?.rates, currency || '₪'),
+    [payments, fx?.rates, currency, yy, mm]
   );
 }
 

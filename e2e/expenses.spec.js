@@ -41,6 +41,24 @@ test('expenses, quick add, subscriptions and settings', async ({ page, context }
   await expect(page.getByText('Netflix').first()).toBeVisible();
   await expect(page.getByText('Spotify').first()).toBeVisible();
 
+  // Paused instead of deleted: out of the totals from today, the past stays.
+  const pauses = () => page.evaluate(async () => {
+    const fb = window.firebase;
+    const doc = await fb.firestore().collection('users').doc(fb.auth().currentUser.uid).collection('payments').doc('p-netflix').get();
+    return doc.data().pauses;
+  });
+  await page.getByText('Netflix').first().click();
+  await page.getByRole('button', { name: 'הקפאת המנוי' }).click();
+  await page.getByRole('button', { name: 'הקפא', exact: true }).click();
+  await expect(page.getByText('בהקפאה', { exact: true })).toBeVisible();
+  await expect(page.getByText('מנוי אחד', { exact: true })).toBeVisible();
+  await expect.poll(pauses).toEqual([{ from: today }]);
+  await page.getByText('Netflix').first().click();
+  await page.getByRole('button', { name: 'חידוש המנוי' }).click();
+  await expect(page.getByText('2 מנויים', { exact: true })).toBeVisible();
+  await expect(page.getByText('בהקפאה', { exact: true })).toBeHidden();
+  await expect.poll(pauses).toEqual([]);
+
   await tab(page, 'סיכום');
   await tab(page, 'הגדרות');
   await page.getByRole('button', { name: 'כהה', exact: true }).click();

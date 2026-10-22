@@ -42,7 +42,9 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
   const [manageOpen, setManageOpen] = React.useState(false);
 
   const currency = settings.defaultCurrency || '₪';
-  const subsMonthly = useSubsMonthly(payments, currency);
+  const prevMonth = new Date(view.y, view.m - 1, 1);
+  const subsMonthly = useSubsMonthly(payments, currency, view.y, view.m);
+  const prevSubs = useSubsMonthly(payments, currency, prevMonth.getFullYear(), prevMonth.getMonth());
   const args = {
     items: lists.items,
     income: Number(settings.monthlyIncome) || 0,
@@ -52,10 +54,9 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
   };
   const stats = React.useMemo(() => computeBudgetStats({ ...args, y: view.y, m: view.m }),
     [lists.items, settings, subsMonthly, categories.join('|'), view.y, view.m]);
-  const prevStats = React.useMemo(() => {
-    const p = new Date(view.y, view.m - 1, 1);
-    return computeBudgetStats({ ...args, y: p.getFullYear(), m: p.getMonth() });
-  }, [lists.items, settings, subsMonthly, categories.join('|'), view.y, view.m]);
+  const prevStats = React.useMemo(
+    () => computeBudgetStats({ ...args, subsMonthly: prevSubs, y: prevMonth.getFullYear(), m: prevMonth.getMonth() }),
+    [lists.items, settings, prevSubs, categories.join('|'), view.y, view.m]);
 
   const atCurrent = view.y === now.getFullYear() && view.m === now.getMonth();
   const shift = (delta) => {

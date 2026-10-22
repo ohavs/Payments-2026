@@ -5,6 +5,10 @@
 // Monthly and yearly occurrences keep the anchor's day of month and clamp it
 // to short months: an anchor on Jan 31 falls on Feb 28, then Mar 31 again.
 //
+// A paused payment keeps its past charges and has none from the day it was
+// paused until the day it was resumed. `pauses` lists them as {from, to}
+// (YYYY-MM-DD, `to` exclusive); the current pause has no `to`.
+//
 // All dates are local midnights. This file has no imports so the Cloud
 // Function can use an identical copy (functions/recurrence.mjs).
 
@@ -57,31 +61,88 @@ function firstIndexOnOrAfter(anchor, cycle, day) {
   return k;
 }
 
-// Next charge on or after today, or null when the payment has no valid date.
+// The pause covering `d`, if any.
+function pauseAt(payment, d) {
+  const iso = toISO(d);
+  return (payment.pauses || []).find((x) => x.from <= iso && (!x.to || iso < x.to)) || null;
+}
+
+export function isPaused(payment) {
+  return (payment.pauses || []).some((x) => x.from && !x.to);
+}
+
+// Paused from today on. Pausing on the day it was resumed continues that pause.
+export function pausedFrom(payment, today = new Date()) {
+  const iso = toISO(startOfDay(today));
+  const pauses = (payment.pauses || []).filter((x) => x.from);
+  const last = pauses[pauses.length - 1];
+  if (last && !last.to) return pauses;
+  if (last && last.to === iso) return [...pauses.slice(0, -1), { from: last.from }];
+  return [...pauses, { from: iso }];
+}
+
+// Charged again from today on. A pause that started today is dropped.
+export function resumedFrom(payment, today = new Date()) {
+  const iso = toISO(startOfDay(today));
+  return (payment.pauses || []).flatMap((x) => {
+    if (!x.from || x.to) return [x];
+    return x.from >= iso ? [] : [{ from: x.from, to: iso }];
+  });
+}
+
+// True when a pause covers every day from `from` to `to`, both inclusive.
+export function pausedThrough(payment, from, to) {
+  const a = toISO(from), b = toISO(to);
+  return (payment.pauses || []).some((x) => x.from <= a && (!x.to || x.to > b));
+}
+
+// Index of the first charge on or after `day` that isn't paused, or -1.
+function firstActiveIndex(payment, anchor, day) {
+  let k = firstIndexOnOrAfter(anchor, payment.cycle, day);
+  for (;;) {
+    const p = pauseAt(payment, occurrence(anchor, payment.cycle, k));
+    if (!p) return k;
+    if (!p.to) return -1;
+    k = firstIndexOnOrAfter(anchor, payment.cycle, parseISO(p.to));
+  }
+}
+
+// Next charge on or after today, or null when the payment has no valid date
+// or is paused.
 export function nextOccurrence(payment, today = new Date()) {
   const anchor = parseISO(payment.nextDate);
   if (!anchor) return null;
-  return occurrence(anchor, payment.cycle, firstIndexOnOrAfter(anchor, payment.cycle, startOfDay(today)));
+  const k = firstActiveIndex(payment, anchor, startOfDay(today));
+  return k < 0 ? null : occurrence(anchor, payment.cycle, k);
 }
 
 // Most recent charge strictly before today, or null if none since the anchor.
 export function lastOccurrenceBefore(payment, today = new Date()) {
   const anchor = parseISO(payment.nextDate);
   if (!anchor) return null;
-  const k = firstIndexOnOrAfter(anchor, payment.cycle, startOfDay(today)) - 1;
-  return k < 0 ? null : occurrence(anchor, payment.cycle, k);
+  let k = firstIndexOnOrAfter(anchor, payment.cycle, startOfDay(today)) - 1;
+  while (k >= 0) {
+    const d = occurrence(anchor, payment.cycle, k);
+    const p = pauseAt(payment, d);
+    if (!p) return d;
+    k = firstIndexOnOrAfter(anchor, payment.cycle, parseISO(p.from)) - 1;
+  }
+  return null;
 }
 
-// Every charge between two dates, both inclusive. Nothing before the anchor.
+// Every charge between two dates, both inclusive. Nothing before the anchor
+// and nothing while paused.
 export function occurrencesBetween(payment, from, to) {
   const anchor = parseISO(payment.nextDate);
   if (!anchor) return [];
   const end = startOfDay(to);
   const out = [];
-  for (let k = firstIndexOnOrAfter(anchor, payment.cycle, startOfDay(from)); out.length < 400; k++) {
+  let k = firstActiveIndex(payment, anchor, startOfDay(from));
+  while (k >= 0 && out.length < 400) {
     const d = occurrence(anchor, payment.cycle, k);
     if (d > end) break;
     out.push(d);
+    k = firstActiveIndex(payment, anchor, new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
   }
   return out;
 }

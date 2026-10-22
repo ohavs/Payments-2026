@@ -48,8 +48,10 @@ function sumAmounts(items) {
   return items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
 }
 
-function subsMonthly(subs) {
-  return subs.reduce((s, p) => s + (Number(p.price) || 0) * (TO_ILS[p.currency || '₪'] || 1) * (PER_MONTH[p.cycle] || 1), 0);
+// Subscriptions paused for the whole of `range` ({from, to}, YYYY-MM-DD) don't
+// count. `pauses`: [{from, to?}], `to` exclusive (src/lib/recurrence.js).
+function subsMonthly(subs, range) {
+  return subs.filter((p) => !range || !(p.pauses || []).some((x) => x.from <= range.from && (!x.to || x.to > range.to))).reduce((s, p) => s + (Number(p.price) || 0) * (TO_ILS[p.currency || '₪'] || 1) * (PER_MONTH[p.cycle] || 1), 0);
 }
 
 // Which alert to send after a new expense: 100 when the cap was just

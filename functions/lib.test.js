@@ -42,4 +42,10 @@ describe('helpers', () => {
   it('subsMonthly converts cycle and currency', () => {
     expect(subsMonthly([{ price: 120, cycle: 'yearly' }, { price: 10, currency: '$', cycle: 'monthly' }])).toBeCloseTo(47);
   });
+  it('subsMonthly skips subscriptions paused all month', () => {
+    const subs = [{ price: 50, cycle: 'monthly', pauses: [{ from: '2026-04-20' }] }, { price: 30, cycle: 'monthly' }];
+    expect(subsMonthly(subs, monthRange(2026, 3))).toBe(80);
+    expect(subsMonthly(subs, monthRange(2026, 4))).toBe(30);
+    expect(subsMonthly([{ ...subs[0], pauses: [{ from: '2026-04-20', to: '2026-05-10' }] }], monthRange(2026, 4))).toBe(50);
+  });
 });

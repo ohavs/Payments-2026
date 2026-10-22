@@ -206,6 +206,10 @@ function AppInner() {
     try { await subOps.remove(id); setDetail(null); toast('התשלום נמחק', { type: 'success' }); }
     catch (e) { toast('שגיאה במחיקה', { type: 'error' }); }
   };
+  const pausePayment = async (p, paused) => {
+    try { await subOps.update(p); setDetail(null); toast(paused ? 'המנוי הוקפא' : 'המנוי חודש', { type: 'success' }); }
+    catch (e) { toast('שגיאה בשמירה', { type: 'error' }); }
+  };
   const addPayment = async (p) => {
     try { await subOps.add(p); toast(activeShared ? `המנוי נוסף ל${lists.activeList?.name || 'מרחב המשותף'}` : 'המנוי נוסף', { type: 'success' }); }
     catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
@@ -377,6 +381,7 @@ function AppInner() {
           onClose={() => setDetail(null)}
           onSave={savePayment}
           onDelete={deletePayment}
+          onPause={pausePayment}
           onEditCustom={(p) => { setDetail(null); setEditCustom(p); }}
         />
         <AddSheet
