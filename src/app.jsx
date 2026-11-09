@@ -15,7 +15,7 @@ import { SettingsScreen } from './screens.jsx';
 import { SharedSpaceSheet } from './spaces.jsx';
 import { AddSheet, DetailSheet, EditCustomSheet } from './sheets.jsx';
 import { GmailScanSheet, SuggestionsCard, useDetectedSuggestions, useGmailInbox } from './suggestions.jsx';
-import { listSuggestions, onDetectEvent, suggestionToItem, takeLaunchAction } from './lib/detect.js';
+import { detectedItemId, listSuggestions, onDetectEvent, suggestionToItem, takeLaunchAction } from './lib/detect.js';
 import { NavIcon } from './ui/icons.jsx';
 import { UpdateSheet } from './update-sheet.jsx';
 import { haptic, isNative, setBaseBackHandler, setStatusBarTheme } from './lib/platform.js';
@@ -127,6 +127,7 @@ function AppInner() {
   const [updateOpen, setUpdateOpen] = useState(false);
   const [sharedOpen, setSharedOpen] = useState(false);
   const [quickPrefill, setQuickPrefill] = useState(null);
+  const quickClosedAt = useRef(0);
   const [gmailOpen, setGmailOpen] = useState(false);
   const fx = useExchangeRates();
   const detected = useDetectedSuggestions(isNative && !!user);
@@ -214,9 +215,9 @@ function AppInner() {
     try { await subOps.add(p); toast(activeShared ? `המנוי נוסף ל${lists.activeList?.name || 'מרחב המשותף'}` : 'המנוי נוסף', { type: 'success' }); }
     catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
-  const addExpense = async (item) => {
+  const addExpense = async (item, docId) => {
     try {
-      await lists.ops.addItem(lists.activeListId, item);
+      await lists.ops.addItem(lists.activeListId, item, docId);
       haptic('success');
     } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
   };
@@ -226,15 +227,22 @@ function AppInner() {
   const toItem = (s) => suggestionToItem(s, {
     categories, items: lists.items, currency: spaceSettings.defaultCurrency || '₪', rates: fx?.rates,
   });
-  const addSuggestions = async (list) => {
-    if (!list.length || !lists.activeListId) return;
-    try {
-      const added = [];
-      for (const s of list) { const item = toItem(s); await lists.ops.addItem(lists.activeListId, item); added.push(item); }
-      removeSuggestions(list.map((s) => s.id));
-      haptic('success');
-      toast(added.length === 1 ? `נוספה הוצאה · ${fmtMoney(added[0].amount)} · ${added[0].title}` : `נוספו ${added.length} הוצאות`, { type: 'success' });
-    } catch (e) { toast('שגיאה בהוספה', { type: 'error' }); }
+  // The write lands on the phone at once and syncs when there is signal;
+  // its promise waits for the server, which on a weak connection takes a
+  // while. So the suggestion goes away and the toast shows right away, and
+  // a suggestion already on its way is not added again.
+  const addingRef = useRef(new Set());
+  const addSuggestions = (list) => {
+    const fresh = list.filter((s) => !addingRef.current.has(s.id));
+    if (!fresh.length || !lists.activeListId) return;
+    fresh.forEach((s) => addingRef.current.add(s.id));
+    const listId = lists.activeListId;
+    const added = fresh.map(toItem);
+    removeSuggestions(fresh.map((s) => s.id));
+    haptic('success');
+    toast(added.length === 1 ? `נוספה הוצאה · ${fmtMoney(added[0].amount)} · ${added[0].title}` : `נוספו ${added.length} הוצאות`, { type: 'success' });
+    Promise.all(fresh.map((s, i) => lists.ops.addItem(listId, added[i], detectedItemId(s))))
+      .catch(() => toast('שגיאה בהוספה', { type: 'error' }));
   };
   // Wallet / card suggestions live on the phone; Gmail ones from before the
   // background check in the Gmail inbox.
@@ -361,18 +369,26 @@ function AppInner() {
           </button>
         )}
 
-        <TabBar tab={tab} setTab={setTab} onAdd={() => openQuickAdd()} addOpen={quickOpen} />
+        <TabBar tab={tab} setTab={setTab} addOpen={quickOpen} onAdd={() => {
+          // The second tap of a double tap on "שמור" lands on the + below it.
+          if (Date.now() - quickClosedAt.current < 500) return;
+          openQuickAdd();
+        }} />
 
         <QuickAddSheet
           open={quickOpen}
-          onClose={() => setQuickOpen(false)}
+          onClose={() => { quickClosedAt.current = Date.now(); setQuickOpen(false); }}
           categories={categories}
           defaultCategory={quickCategory}
           prefill={quickPrefill}
           recentTitles={recentTitles}
           canSave={!!lists.activeListId}
           list={activeShared ? lists.activeList : null}
-          onAdd={(item) => { addExpense(item); if (quickPrefill?.suggestionId) removeSuggestions([quickPrefill.suggestionId]); }}
+          onAdd={(item) => {
+            const sid = quickPrefill?.suggestionId;
+            addExpense(item, sid ? detectedItemId({ id: sid }) : undefined);
+            if (sid) removeSuggestions([sid]);
+          }}
           onAddSubscription={() => { setQuickOpen(false); setTimeout(() => setAddSubOpen(true), 260); }}
         />
         <DetailSheet
@@ -400,7 +416,7 @@ function AppInner() {
         <GmailScanSheet open={gmailOpen} onClose={() => setGmailOpen(false)}
           categories={categories} items={lists.items} subs={allSubs}
           currency={spaceSettings.defaultCurrency || '₪'} rates={fx?.rates}
-          onAddExpense={(item) => lists.ops.addItem(lists.activeListId, item).then(() => toast(`נוספה הוצאה · ${fmtMoney(item.amount)} · ${item.title}`, { type: 'success' })).catch(() => toast('שגיאה בהוספה', { type: 'error' }))}
+          onAddExpense={(item, sid) => lists.ops.addItem(lists.activeListId, item, detectedItemId({ id: sid })).then(() => toast(`נוספה הוצאה · ${fmtMoney(item.amount)} · ${item.title}`, { type: 'success' })).catch(() => toast('שגיאה בהוספה', { type: 'error' }))}
           onAddSubscription={addPayment} onScanned={gmailInbox.enableAuto} />
       </div>
     </div>

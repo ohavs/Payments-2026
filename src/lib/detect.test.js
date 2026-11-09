@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { guessCategory, isAlreadyRecorded, merchantKind, suggestionToItem } from './detect.js';
+import { detectedItemId, guessCategory, isAlreadyRecorded, merchantKind, suggestionToItem } from './detect.js';
 
 const CATS = ['קניות', 'ביטוחים', 'אוכל בחוץ', 'שונות'];
 
@@ -43,5 +43,13 @@ describe('isAlreadyRecorded', () => {
     expect(isAlreadyRecorded({ amount: 45.9, time: t }, [{ amount: 45.9, date: '2026-10-11' }])).toBe(true);
     expect(isAlreadyRecorded({ amount: 45.9, time: t }, [{ amount: 45.9, date: '2026-10-05' }])).toBe(false);
     expect(isAlreadyRecorded({ amount: 45.9, time: t }, [{ amount: 30, date: '2026-10-12' }])).toBe(false);
+  });
+});
+
+describe('detectedItemId', () => {
+  it('is the same for the same suggestion and a valid document id', () => {
+    expect(detectedItemId({ id: 'gmail:18c2f/a' })).toBe('detected-gmail_18c2f_a');
+    expect(detectedItemId({ id: 'gmail:18c2f/a' })).toBe(detectedItemId({ id: 'gmail:18c2f/a' }));
+    expect(detectedItemId({ id: 'b9e0-11' })).not.toBe(detectedItemId({ id: 'b9e0-12' }));
   });
 });

@@ -72,6 +72,11 @@ export function suggestionToItem(s, { categories, items = [], currency = '₪', 
   };
 }
 
+// The expense a suggestion becomes always gets the same document id, so
+// adding it twice (a second tap on a slow connection, the notification and
+// the card) leaves one expense.
+export const detectedItemId = (s) => `detected-${String(s.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
 // Already in the list? Same amount within two days of an existing expense.
 export function isAlreadyRecorded(s, items) {
   const day = 86400000;

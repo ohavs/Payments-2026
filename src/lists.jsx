@@ -247,7 +247,12 @@ function useLists(uid, user) {
         batch.delete(col().doc(id));
         await batch.commit();
       },
-      addItem: (id, item) => col().doc(id).collection('items').add({
+      // docId: a fixed id for an expense that must not be saved twice (a
+      // detected payment tapped again while the first write waits for the
+      // server). Writing it again only rewrites the same document.
+      addItem: (id, item, docId) => {
+        const items = col().doc(id).collection('items');
+        return (docId ? items.doc(docId) : items.doc()).set({
         title: (item.title || '').trim(),
         group: item.group || '',
         amount: cleanAmount(item.amount),
@@ -260,7 +265,8 @@ function useLists(uid, user) {
         paidBy: item.paidBy || uid,
         addedBy: uid,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      }),
+      });
+      },
       updateItem: (id, item) => {
         const { id: itemId, ...rest } = item;
         const data = { ...rest };

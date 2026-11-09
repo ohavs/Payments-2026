@@ -33,8 +33,8 @@ test('expenses, quick add, subscriptions and settings', async ({ page, context }
   await expect(page.getByText('שופרסל').first()).toBeVisible();
   await expect(page.getByText('ארוחת צהריים').first()).toBeVisible();
 
-  // Quick add from the + button.
-  await quickAdd(page, ['4', '5'], 'אוכל בחוץ');
+  // Quick add from the + button. A double tap on save adds one expense.
+  await quickAdd(page, ['4', '5'], 'אוכל בחוץ', undefined, { doubleTap: true });
   await expect.poll(async () => (await spaceItems(page, 'personal')).items.map((i) => i.amount).sort((x, y) => x - y)).toEqual([45, 74, 286]);
 
   await tab(page, 'מנויים');

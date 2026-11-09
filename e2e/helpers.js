@@ -29,12 +29,13 @@ export async function signInGuest(page, name) {
 
 export const tab = (page, label) => page.locator(`nav button[aria-label="${label}"]`).click();
 
-export async function quickAdd(page, digits, category, payer) {
+export async function quickAdd(page, digits, category, payer, { doubleTap = false } = {}) {
   await page.locator('nav button[aria-label="הוספת הוצאה"]').click();
   for (const d of digits) await page.locator(`button[aria-label="${d}"]`).click();
   await page.getByRole('button', { name: category, exact: true }).last().click();
   if (payer) await page.getByRole('button', { name: payer, exact: true }).last().click();
-  await page.getByRole('button', { name: /^שמור · / }).click();
+  const save = page.getByRole('button', { name: /^שמור · / });
+  if (doubleTap) await save.dblclick(); else await save.click();
   await expect(page.getByRole('button', { name: /^שמור · / })).toBeHidden();
 }
 

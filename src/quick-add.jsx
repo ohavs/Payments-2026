@@ -32,8 +32,11 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, prefill, re
   const [calendarOpen, setCalendarOpen] = React.useState(false);
   const [paidBy, setPaidBy] = React.useState(null);
 
+  // One save per opening: a second tap while the sheet closes adds nothing.
+  const savedRef = React.useRef(false);
   React.useEffect(() => {
     if (!open) return;
+    savedRef.current = false;
     setAmount(''); setBump(0); setTitle(''); setDate(todayISO()); setCalendarOpen(false);
     setPaidBy(fbAuth.currentUser?.uid || null);
     setCategory(defaultCategory && categories.includes(defaultCategory) ? defaultCategory : categories[0]);
@@ -50,7 +53,8 @@ function QuickAddSheet({ open, onClose, categories, defaultCategory, prefill, re
   const ready = value > 0 && canSave;
 
   const save = () => {
-    if (!ready) return;
+    if (!ready || savedRef.current) return;
+    savedRef.current = true;
     const item = { title: title.trim() || category, amount: value, group: category, note: prefill?.note || '', date };
     if (prefill?.source) item.source = prefill.source;
     if (list && paidBy) item.paidBy = paidBy;

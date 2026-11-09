@@ -230,7 +230,7 @@ function GmailScanSheet({ open, onClose, categories, items, subs, currency, rate
     haptic('success');
   };
   const addReceipt = (r) => {
-    onAddExpense(suggestionToItem(r, { categories, items, currency, rates }));
+    onAddExpense(suggestionToItem(r, { categories, items, currency, rates }), r.id);
     markHandled([r.id]);
   };
 
