@@ -49,13 +49,18 @@ public final class DetectNotifier {
         String id = s.optString("id");
         int nid = notificationId(id);
         String merchant = s.optString("merchant", "");
-        String title = amountLabel(s) + (merchant.isEmpty() ? "" : " · " + merchant);
+        boolean noAmount = s.optBoolean("needsAmount", false);
+        String title = noAmount
+            ? (merchant.isEmpty() ? "תשלום ב־Wallet" : "תשלום · " + merchant)
+            : amountLabel(s) + (merchant.isEmpty() ? "" : " · " + merchant);
+        String text = "gmail".equals(s.optString("source")) ? "קבלה במייל · להוסיף להוצאות?"
+            : noAmount ? "בלי סכום · להוסיף ולהקליד סכום?" : "להוסיף להוצאות?";
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_notify)
             .setColor(0xFF22A45D)
             .setContentTitle(title)
-            .setContentText("gmail".equals(s.optString("source")) ? "קבלה במייל · להוסיף להוצאות?" : "להוסיף להוצאות?")
+            .setContentText(text)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setContentIntent(activity(c, "open", id, nid))

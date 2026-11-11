@@ -83,9 +83,10 @@ public final class GmailReceiptScanner {
                 long time = msg.optLong("internalDate", now);
                 if (time < since) continue;
                 JSONObject s = suggestion(msg, id, time);
-                if (s != null && SuggestionStore.add(c, s)) {
+                JSONObject shown = s != null ? SuggestionStore.add(c, s) : null;
+                if (shown != null) {
                     added++;
-                    DetectNotifier.show(c, s);
+                    DetectNotifier.show(c, shown);
                 }
             }
         } catch (IOException | JSONException e) {

@@ -69,10 +69,37 @@ public class PaymentDetectPlugin extends Plugin {
 
     @PluginMethod
     public void status(PluginCall call) {
+        boolean access = hasAccess();
+        boolean enabled = SuggestionStore.isEnabled(getContext());
+        boolean connected = PaymentListenerService.connected;
+        // Granted but not bound (OEM battery saver, after an update): ask again.
+        if (access && !connected) PaymentListenerService.requestRebind(getContext());
         JSObject ret = new JSObject();
-        ret.put("access", hasAccess());
-        ret.put("enabled", SuggestionStore.isEnabled(getContext()));
+        ret.put("access", access);
+        ret.put("enabled", enabled);
+        ret.put("connected", connected);
+        ret.put("lastConnected", DetectLog.get(getContext(), "lastConnected"));
+        ret.put("lastDisconnected", DetectLog.get(getContext(), "lastDisconnected"));
+        ret.put("lastSeen", DetectLog.get(getContext(), "lastSeen"));
         call.resolve(ret);
+    }
+
+    /** What the listener saw lately and what it decided (Settings → diagnostics). */
+    @PluginMethod
+    public void log(PluginCall call) {
+        JSObject ret = new JSObject();
+        try {
+            ret.put("entries", new JSArray(DetectLog.list(getContext()).toString()));
+        } catch (JSONException e) {
+            ret.put("entries", new JSArray());
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void clearLog(PluginCall call) {
+        DetectLog.clear(getContext());
+        call.resolve();
     }
 
     @PluginMethod

@@ -233,7 +233,10 @@ function AppInner() {
   // a suggestion already on its way is not added again.
   const addingRef = useRef(new Set());
   const addSuggestions = (list) => {
-    const fresh = list.filter((s) => !addingRef.current.has(s.id));
+    // A Wallet tap without an amount opens the form to type it.
+    const ready = list.filter((s) => !s.needsAmount);
+    if (!ready.length) { const s = list.find((x) => x.needsAmount); if (s) editSuggestion(s); return; }
+    const fresh = ready.filter((s) => !addingRef.current.has(s.id));
     if (!fresh.length || !lists.activeListId) return;
     fresh.forEach((s) => addingRef.current.add(s.id));
     const listId = lists.activeListId;
@@ -266,6 +269,7 @@ function AppInner() {
     if (a.action !== 'add') { detected.refresh(); return; }
     const s = (await listSuggestions()).find((x) => x.id === a.id);
     if (s) addSuggestions([s]);
+    else detected.refresh();
   };
   useEffect(() => {
     if (!isNative || !user || !lists.activeListId) return;

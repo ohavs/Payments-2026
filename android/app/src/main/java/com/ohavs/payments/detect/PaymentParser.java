@@ -33,10 +33,28 @@ public final class PaymentParser {
         }
     }
 
-    /** Google Wallet, and Play services which posted tap-to-pay notifications before mid 2024. */
+    /** Why a notification was not offered, for the in-app log. */
+    public static final class Outcome {
+        public final Result result;
+        public final String reason;
+        public final String detail;
+
+        Outcome(Result result, String reason, String detail) {
+            this.result = result;
+            this.reason = reason;
+            this.detail = detail;
+        }
+    }
+
+    /**
+     * Google Wallet, Play services (posted tap-to-pay notifications before mid
+     * 2024) and Samsung Wallet.
+     */
     static final Set<String> WALLET_PACKAGES = new HashSet<>(Arrays.asList(
         "com.google.android.apps.walletnfcrel",
-        "com.google.android.gms"
+        "com.google.android.gms",
+        "com.samsung.android.spay",
+        "com.samsung.android.spayfw"
     ));
 
     /** Chats and mail: people and newsletters mention prices all the time. Gmail has its own scan. */
@@ -77,6 +95,16 @@ public final class PaymentParser {
     };
     private static final Pattern LAST4 = Pattern.compile(
         "(?:המסתיים ב|מסתיים ב|שמספרו|ending in|ending|[•*]{2,}|x{2,})\\s?-?\\s?(\\d{4})", Pattern.CASE_INSENSITIVE);
+    /** A card named in a Wallet notification: masked digits or the brand/issuer. */
+    private static final Pattern CARD = Pattern.compile(
+        "[•*·]{2,}\\s?\\d{4}|\\b(?:visa|mastercard|master card|amex|american express|diners|isracard|max|cal)\\b|"
+            + "ויזה|מאסטרקארד|ישראכרט|דיינרס|אמריקן אקספרס|כאל|מקס",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern DONE_WORDS = Pattern.compile("בוצע|הושלם|done|complete|success", Pattern.CASE_INSENSITIVE);
+    /** Wallet also writes about cards being added, verified or expiring. */
+    private static final Pattern SETUP_WORDS = Pattern.compile(
+        "מוכן|נוסף|הוסף|הוספ|להוסיף|הגדר|אמת|תוקף|עדכן|ready|added|\\badd\\b|set up|verif|expir|update",
+        Pattern.CASE_INSENSITIVE);
     private static final Pattern GENERIC_TITLE = Pattern.compile(
         "עסקה|חיוב|התראה|הודעה|אשראי|כרטיס|תשלום|transaction|payment|purchase|alert|card|wallet|google pay",
         Pattern.CASE_INSENSITIVE);
@@ -95,13 +123,29 @@ public final class PaymentParser {
     }
 
     public static Result parse(String pkg, String title, String text) {
-        if (pkg != null && IGNORED_PACKAGES.contains(pkg)) return null;
+        return analyze(pkg, title, text).result;
+    }
+
+    private static Outcome no(String reason, String detail) {
+        return new Outcome(null, reason, detail);
+    }
+
+    /** True when the text holds an amount with a currency: worth logging even if not offered. */
+    public static boolean mentionsMoney(String text) {
+        String x = normalize(text);
+        return CUR_FIRST.matcher(x).find() || CUR_LAST.matcher(x).find();
+    }
+
+    public static Outcome analyze(String pkg, String title, String text) {
+        if (pkg != null && IGNORED_PACKAGES.contains(pkg)) return no("ignored-app", null);
         String t = normalize(title);
         String x = normalize(text);
         String all = t.isEmpty() ? x : x.isEmpty() ? t : t + "\n" + x;
-        if (all.isEmpty() || NOT_A_CHARGE.matcher(all).find()) return null;
+        if (all.isEmpty()) return no("empty", null);
+        Matcher nc = NOT_A_CHARGE.matcher(all);
+        if (nc.find()) return no("not-a-charge", nc.group());
         boolean wallet = pkg != null && WALLET_PACKAGES.contains(pkg);
-        if (!wallet && !CHARGE_WORDS.matcher(all).find()) return null;
+        if (!wallet && !CHARGE_WORDS.matcher(all).find()) return no("no-charge-words", null);
 
         double amount = -1;
         String currency = "₪";
@@ -119,7 +163,7 @@ public final class PaymentParser {
             Matcher b = BARE.matcher(all);
             if (b.find()) amount = number(b.group(1));
         }
-        if (!(amount > 0) || amount > 200000) return null;
+        if (amount > 200000) return no("amount-range", String.valueOf(amount));
 
         String merchant = null;
         if (wallet && !t.isEmpty() && !CUR_FIRST.matcher(t).find() && !CUR_LAST.matcher(t).find()
@@ -142,7 +186,15 @@ public final class PaymentParser {
 
         Matcher l4 = LAST4.matcher(all);
         String last4 = l4.find() ? l4.group(1) : null;
-        return new Result(Math.round(amount * 100) / 100.0, currency, merchant, last4);
+        if (!(amount > 0)) {
+            // Wallet can report the tap before the card issuer sends the amount
+            // (or never does): still offer it, the user types the amount.
+            boolean card = last4 != null || CARD.matcher(all).find();
+            boolean paid = merchant != null || CHARGE_WORDS.matcher(all).find() || DONE_WORDS.matcher(all).find();
+            if (!wallet || !card || !paid || SETUP_WORDS.matcher(all).find()) return no("no-amount", null);
+            return new Outcome(new Result(0, currency, merchant, last4), "ok-no-amount", null);
+        }
+        return new Outcome(new Result(Math.round(amount * 100) / 100.0, currency, merchant, last4), "ok", null);
     }
 
     private static String clean(String s) {

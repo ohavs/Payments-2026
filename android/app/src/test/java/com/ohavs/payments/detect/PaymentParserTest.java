@@ -92,4 +92,46 @@ public class PaymentParserTest {
         assertNull(parse(CARD_APP, "Shop", "₪120"));
         assertNotNull(parse(WALLET, "Shop", "₪120"));
     }
+
+    @Test
+    public void walletWithoutAmountIsOfferedToType() {
+        PaymentParser.Outcome o = PaymentParser.analyze(WALLET, "שופרסל דיל", "Visa •••• 1234");
+        assertNotNull(o.result);
+        assertEquals("ok-no-amount", o.reason);
+        assertEquals(0, o.result.amount, 0.001);
+        assertEquals("שופרסל דיל", o.result.merchant);
+        assertEquals("1234", o.result.last4);
+        assertNotNull(parse(WALLET, "Google Wallet", "התשלום בוצע באמצעות Mastercard ••5678"));
+    }
+
+    @Test
+    public void walletCardNewsIsNotAPayment() {
+        assertNull(parse(WALLET, "Google Wallet", "Visa •••• 1234 מוכן לשימוש"));
+        assertNull(parse(WALLET, "Google Wallet", "Your Visa •••• 1234 was added"));
+        assertNull(parse(WALLET, "Google Wallet", "Visa •••• 1234 expires soon"));
+        assertNull(parse(WALLET, "כרטיס עלייה למטוס", "הטיסה שלך יוצאת בעוד 3 שעות"));
+    }
+
+    @Test
+    public void cardAppWithoutAmountIsSkipped() {
+        assertNull(parse(CARD_APP, "שופרסל", "אושרה עסקה בכרטיס המסתיים ב-1234"));
+    }
+
+    @Test
+    public void samsungWallet() {
+        PaymentParser.Result r = parse("com.samsung.android.spay", "ארומה", "₪32.00 Visa ••5678");
+        assertNotNull(r);
+        assertEquals(32.0, r.amount, 0.001);
+        assertEquals("ארומה", r.merchant);
+    }
+
+    @Test
+    public void reasons() {
+        assertEquals("no-charge-words", PaymentParser.analyze(CARD_APP, "Shop", "₪120").reason);
+        PaymentParser.Outcome o = PaymentParser.analyze(SMS, "Max", "זיכוי בסך 45 ש\"ח");
+        assertEquals("not-a-charge", o.reason);
+        assertEquals("זיכוי", o.detail);
+        assertEquals("ok", PaymentParser.analyze(WALLET, "Shop", "₪120").reason);
+        assertEquals("ignored-app", PaymentParser.analyze("com.whatsapp", "x", "שילמתי ₪45").reason);
+    }
 }

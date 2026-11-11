@@ -19,6 +19,7 @@ import { Segmented } from './ui/kit.jsx';
 import { PALETTES, iconSvg, validPalette } from './lib/app-icons.js';
 import { applyPalette } from './lib/palette.js';
 import { TimePickerSheet } from './ui/time-picker.jsx';
+import { DetectLogSheet } from './detect-log.jsx';
 
 // ---------- Stats detail sheet (totals breakdown) ----------
 function StatsDetailSheet({ open, onClose, payments, currency = '₪', rates }) {
@@ -324,6 +325,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
+  const [detectLogOpen, setDetectLogOpen] = useState(false);
   const currency = settings.defaultCurrency || '₪';
   const subsMonthly = useSubsMonthly(payments, currency);
 
@@ -383,7 +385,8 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
   };
 
   const detectSub = !detect.enabled ? 'Google Wallet, אפליקציות האשראי ו־SMS'
-    : detect.access ? 'פעיל · תשלום חדש יופיע כהצעה' : 'צריך לאשר גישה להתראות';
+    : !detect.access ? 'צריך לאשר גישה להתראות'
+      : detect.connected === false ? 'לא מחובר · כבה והדלק את הגישה להתראות' : 'פעיל · תשלום חדש יופיע כהצעה';
 
   const exportExpenses = async () => {
     const list = lists.activeList;
@@ -553,6 +556,10 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
             <Row icon="bell" tint="var(--butter)" label="אישור גישה להתראות" sub="פעם אחת, בהגדרות הטלפון"
               onClick={() => openDetectAccess()} right={chevron} />
           )}
+          {isNative && detect.enabled && detect.access && (
+            <Row icon="search" tint="var(--lavender)" label="מה נקלט לאחרונה" sub="התראות תשלום ומה הוחלט עליהן"
+              onClick={() => setDetectLogOpen(true)} right={chevron} />
+          )}
           {!isAnon && (
             <Row icon="download" tint="var(--sky)" label="קבלות מ־Gmail" sub="מנויים וקניות מהמייל"
               onClick={onOpenGmail} right={chevron} />
@@ -592,6 +599,7 @@ function SettingsScreen({ user, settings, setSettings, lists, categories, paymen
       <BudgetSettingsSheet open={budgetOpen} onClose={() => setBudgetOpen(false)}
         settings={settings} setSettings={setSettings} categories={categories} subsMonthly={subsMonthly} />
       <ManageExpensesSheet open={manageOpen} onClose={() => setManageOpen(false)} lists={lists} />
+      <DetectLogSheet open={detectLogOpen} onClose={() => setDetectLogOpen(false)} />
       <TimePickerSheet open={timeOpen} onClose={() => setTimeOpen(false)} title="שעת התזכורת"
         value={settings.notifTime || '09:00'} onSave={(v) => update({ notifTime: v })} />
     </div>

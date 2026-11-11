@@ -57,7 +57,9 @@ function SuggestionRow({ s, category, onAdd, onDismiss, onEdit }) {
             {s.merchant || 'תשלום'}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <span style={{ color: 'var(--ink)', fontWeight: 800, fontSize: 13.5 }}>{fmtMoney(s.amount, s.currency)}</span>
+            {s.needsAmount
+              ? <span style={{ color: 'var(--accent-ink)', fontWeight: 800, fontSize: 13.5 }}>בלי סכום</span>
+              : <span style={{ color: 'var(--ink)', fontWeight: 800, fontSize: 13.5 }}>{fmtMoney(s.amount, s.currency)}</span>}
             {' · '}{category} · {SOURCE_LABEL[s.source] || s.app || 'זוהה'}{s.last4 ? ` ••${s.last4}` : ''} · {ago(s.time)}
           </div>
         </div>
@@ -66,7 +68,7 @@ function SuggestionRow({ s, category, onAdd, onDismiss, onEdit }) {
         width: 36, height: 36, borderRadius: 12, border: 'none', cursor: 'pointer', flexShrink: 0,
         background: 'var(--surface-2)', color: 'var(--ink-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}><Icon name="close" size={16} strokeWidth={2.6} /></button>
-      <button onClick={onAdd} className="btn-primary" style={{
+      <button onClick={s.needsAmount ? onEdit : onAdd} className="btn-primary" style={{
         height: 36, padding: '0 14px', borderRadius: 12, borderWidth: 2, fontSize: 13.5, flexShrink: 0,
       }}>הוסף</button>
     </div>

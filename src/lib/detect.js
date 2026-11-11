@@ -121,3 +121,45 @@ export function onDetectEvent(name, fn) {
   const h = PaymentDetect.addListener(name, fn);
   return () => { h.then((x) => x.remove()); };
 }
+
+// What the listener saw lately and why it did or did not offer it (on the phone only).
+export async function detectLog() {
+  if (!isNative) return [];
+  const { entries } = await PaymentDetect.log();
+  return entries || [];
+}
+export function clearDetectLog() {
+  return isNative ? PaymentDetect.clearLog() : Promise.resolve();
+}
+
+const REASONS = {
+  ok: 'הוצע להוספה',
+  'ok-no-amount': 'הוצע, בלי סכום',
+  duplicate: 'כפול (כבר הוצע)',
+  'no-amount': 'לא נמצא סכום',
+  'no-charge-words': 'לא נראה כמו חיוב',
+  'not-a-charge': 'סונן',
+  'amount-range': 'סכום לא סביר',
+  empty: 'התראה בלי טקסט',
+  summary: 'התראת סיכום',
+  ongoing: 'התראה קבועה',
+};
+export function detectReasonLabel(e) {
+  const base = REASONS[e.reason] || e.reason || '';
+  return e.detail ? `${base} · ${e.detail}` : base;
+}
+
+// Plain text of the log, to paste in a message when something was missed.
+export function detectLogText(entries, status = {}) {
+  const t = (ms) => (ms ? new Date(ms).toLocaleString('he-IL') : '—');
+  const head = [
+    `גישה: ${status.access ? 'כן' : 'לא'} · פעיל: ${status.enabled ? 'כן' : 'לא'} · מחובר: ${status.connected ? 'כן' : 'לא'}`,
+    `חובר לאחרונה: ${t(status.lastConnected)} · נותק: ${t(status.lastDisconnected)} · התראה אחרונה: ${t(status.lastSeen)}`,
+  ];
+  const rows = entries.map((e) => [
+    `${t(e.time)} · ${e.app || e.pkg} (${e.pkg}) · ${detectReasonLabel(e)}`,
+    `  כותרת: ${e.title || ''}`,
+    `  טקסט: ${String(e.text || '').replace(/\n/g, ' ⏎ ')}`,
+  ].join('\n'));
+  return [...head, '', ...rows].join('\n');
+}

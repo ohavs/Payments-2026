@@ -20,6 +20,8 @@ public final class SuggestionStore {
     private static final long MAX_AGE_MS = 14L * 24 * 60 * 60 * 1000;
     // Wallet and the card's own app (or its SMS) report the same purchase.
     private static final long DUPLICATE_WINDOW_MS = 15L * 60 * 1000;
+    // A Wallet tap without an amount right next to another report is the same tap.
+    private static final long SAME_TAP_MS = 3L * 60 * 1000;
 
     private SuggestionStore() {}
 
@@ -59,33 +61,78 @@ public final class SuggestionStore {
         return null;
     }
 
-    /** Adds the suggestion unless the same amount was already captured moments ago. */
-    public static synchronized boolean add(Context c, JSONObject s) {
+    /**
+     * Adds the suggestion unless the same payment was already captured moments
+     * ago. Wallet may report a tap without the amount and the card's app or SMS
+     * with it: the amount fills the waiting suggestion instead of a second one.
+     * Returns the suggestion to show (new or filled in), or null for a duplicate.
+     */
+    public static synchronized JSONObject add(Context c, JSONObject s) {
         JSONArray all = list(c);
-        double amount = s.optDouble("amount");
-        long time = s.optLong("time");
-        for (int i = 0; i < all.length(); i++) {
-            JSONObject o = all.optJSONObject(i);
-            if (o == null) continue;
-            if (Math.abs(o.optDouble("amount") - amount) < 0.005
-                && Math.abs(o.optLong("time") - time) < DUPLICATE_WINDOW_MS) {
-                // Prefer a merchant name if the first report had none.
-                if (o.optString("merchant", "").isEmpty() && !s.optString("merchant", "").isEmpty()) {
-                    try {
-                        o.put("merchant", s.optString("merchant"));
-                        save(c, all);
-                    } catch (JSONException ignored) {
-                        // keep the original
-                    }
-                }
-                return false;
-            }
+        boolean[] changed = {false};
+        JSONObject shown = decide(all, s, changed);
+        if (shown == s) {
+            JSONArray next = new JSONArray();
+            next.put(s);
+            for (int i = 0; i < all.length() && next.length() < MAX_ITEMS; i++) next.put(all.opt(i));
+            save(c, next);
+        } else if (changed[0]) {
+            save(c, all);
         }
-        JSONArray next = new JSONArray();
-        next.put(s);
-        for (int i = 0; i < all.length() && next.length() < MAX_ITEMS; i++) next.put(all.opt(i));
-        save(c, next);
-        return true;
+        return shown;
+    }
+
+    /**
+     * Pure part of {@link #add}: returns {@code s} when it is new, the waiting
+     * suggestion it filled in, or null for a duplicate. Entries of {@code all}
+     * may be updated in place ({@code changed[0]} tells).
+     */
+    static JSONObject decide(JSONArray all, JSONObject s, boolean[] changed) {
+        double amount = s.optDouble("amount", 0);
+        boolean noAmount = !(amount > 0);
+        long time = s.optLong("time");
+        String merchant = s.optString("merchant", "");
+        try {
+            JSONObject waiting = null;
+            for (int i = 0; i < all.length(); i++) {
+                JSONObject o = all.optJSONObject(i);
+                if (o == null) continue;
+                long gap = Math.abs(o.optLong("time") - time);
+                if (gap >= DUPLICATE_WINDOW_MS) continue;
+                boolean oNoAmount = o.optBoolean("needsAmount", false);
+                boolean same;
+                if (noAmount) {
+                    same = gap < SAME_TAP_MS
+                        || (s.optString("pkg").equals(o.optString("pkg")) && merchant.equals(o.optString("merchant", "")));
+                } else {
+                    same = !oNoAmount && Math.abs(o.optDouble("amount", 0) - amount) < 0.005;
+                }
+                if (same) {
+                    // Prefer a merchant name if the first report had none.
+                    if (o.optString("merchant", "").isEmpty() && !merchant.isEmpty()) {
+                        o.put("merchant", merchant);
+                        changed[0] = true;
+                    }
+                    return null;
+                }
+                if (!noAmount && oNoAmount
+                    && (waiting == null || gap < Math.abs(waiting.optLong("time") - time))) {
+                    waiting = o;
+                }
+            }
+            if (waiting != null) {
+                waiting.put("amount", amount);
+                waiting.put("currency", s.optString("currency", "₪"));
+                waiting.remove("needsAmount");
+                if (waiting.optString("merchant", "").isEmpty()) waiting.put("merchant", merchant);
+                if (waiting.optString("last4", "").isEmpty()) waiting.put("last4", s.optString("last4", ""));
+                changed[0] = true;
+                return waiting;
+            }
+        } catch (JSONException ignored) {
+            // Keep it as a new suggestion.
+        }
+        return s;
     }
 
     public static synchronized void remove(Context c, String id) {

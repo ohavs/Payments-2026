@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectedItemId, guessCategory, isAlreadyRecorded, merchantKind, suggestionToItem } from './detect.js';
+import { detectLogText, detectReasonLabel, detectedItemId, guessCategory, isAlreadyRecorded, merchantKind, suggestionToItem } from './detect.js';
 
 const CATS = ['קניות', 'ביטוחים', 'אוכל בחוץ', 'שונות'];
 
@@ -51,5 +51,22 @@ describe('detectedItemId', () => {
     expect(detectedItemId({ id: 'gmail:18c2f/a' })).toBe('detected-gmail_18c2f_a');
     expect(detectedItemId({ id: 'gmail:18c2f/a' })).toBe(detectedItemId({ id: 'gmail:18c2f/a' }));
     expect(detectedItemId({ id: 'b9e0-11' })).not.toBe(detectedItemId({ id: 'b9e0-12' }));
+  });
+});
+
+describe('detect log', () => {
+  it('labels why a notification was or was not offered', () => {
+    expect(detectReasonLabel({ reason: 'no-amount' })).toBe('לא נמצא סכום');
+    expect(detectReasonLabel({ reason: 'not-a-charge', detail: 'זיכוי' })).toBe('סונן · זיכוי');
+    expect(detectReasonLabel({ reason: 'new-reason' })).toBe('new-reason');
+  });
+  it('copies as plain text with the listener state', () => {
+    const text = detectLogText(
+      [{ time: 1, pkg: 'com.google.android.apps.walletnfcrel', app: 'Wallet', title: 'שופרסל', text: 'Visa\n•••• 1234', reason: 'ok-no-amount' }],
+      { access: true, enabled: true, connected: false },
+    );
+    expect(text).toContain('מחובר: לא');
+    expect(text).toContain('Wallet (com.google.android.apps.walletnfcrel) · הוצע, בלי סכום');
+    expect(text).toContain('טקסט: Visa ⏎ •••• 1234');
   });
 });
