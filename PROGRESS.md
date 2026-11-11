@@ -98,6 +98,7 @@
   - קוראים גם `EXTRA_TEXT_LINES`, ההודעה האחרונה ב־MessagingStyle, sub/summary/info, `EXTRA_TITLE_BIG`. נוסף Samsung Wallet (`com.samsung.android.spay[fw]`)
   - `DetectLog`: 25 ההתראות האחרונות מ־Wallet או עם סכום, עם הסיבה (`PaymentParser.analyze`). הגדרות ← "מה נקלט לאחרונה" (`src/detect-log.jsx`) + העתקה. מצב השירות: `connected` (סטטי, אותו תהליך), חובר/נותק/התראה אחרונה. `onListenerDisconnected` → `requestRebind`
   - לא עושים toggle לרכיב השירות: ב־Android 13+ זה מוחק את הגישה להתראות (`trimApprovedListsForInvalidServices`). כשלא מחובר: הנחיה לכבות ולהדליק את הגישה
+  - פורסם ב־v2.0.90
   - הבא: אחרי התשלום הבא, אם עדיין לא הוצע, להעתיק את "מה נקלט לאחרונה" ולתקן את המפענח לפי הטקסט האמיתי
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
