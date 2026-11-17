@@ -105,7 +105,7 @@
   - `ops.mergeInto(from, to)` (`lists.jsx`): רק ממרחב שרק אני בו. הוצאות ומנויים עוברים עם אותם ids + `movedFrom`; למשותף גם `users/{uid}/payments`, `paidBy` = אני. המרחב נמחק, חוץ מהאישי האחרון שמקבל `hidden: true` (כל משתמש חייב אישי, אחרת נזרע חדש). מוסתר: לא בטאבים, לא בווידג׳ט; ניהול מרחבים ← "להחזיר לטאבים"
   - `onSpaceItemCreated` מדלג על `movedFrom` (בלי הצפת push לבן/בת הזוג)
   - סיכום: הוסר גרף "הוצאה יומית" (המשתמש לא הבין מה הוא מראה) + קוד מת (`BudgetDetailSheet` וכו׳)
-  - e2e `move-all.spec.js`
+  - e2e `move-all.spec.js`. פורסם ב־v2.0.96
   - המלצה למשתמש: לאחד "הרשימה שלי" → "ההוצאות שלי" → המשותף. ממתין שיבצע בטלפון
 - בהמשך: אימות מפתחים של Google לאפליקציות מחוץ ל־Play (בעולם ב־2027). יחייב רישום ב־Android Developer Console (חשבון חינמי עד 20 מכשירים)
 - [x] Gmail: מסך ההסכמה פורסם (Production). דף פרטיות: https://schedual-fdde7.web.app/privacy.html
