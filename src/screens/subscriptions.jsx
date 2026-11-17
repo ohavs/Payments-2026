@@ -9,7 +9,7 @@ import {
 import { useExchangeRates } from '../fx.jsx';
 import { useStickyState } from '../lists.jsx';
 import { CalendarScreen, StatsDetailSheet } from '../screens.jsx';
-import { SpaceSwitcher } from '../spaces.jsx';
+import { SpaceTabs } from '../spaces.jsx';
 import { CoinLogo } from '../ui/icons.jsx';
 import { Card, EmptyState, Money, Pill, Segmented } from '../ui/kit.jsx';
 import { haptic } from '../lib/platform.js';
@@ -54,15 +54,13 @@ function SubscriptionsScreen({ payments, loading, lists, onCreateShared, setting
 
   return (
     <div style={{ padding: '18px 18px 120px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>מנויים</h1>
+      <SpaceTabs lists={lists} title="מנויים" onCreateShared={onCreateShared}>
         <button onClick={() => { haptic('tap'); onOpenAdd(); }} className="press" style={{
           height: 42, padding: '0 16px', borderRadius: 999, border: 'none', cursor: 'pointer',
           background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', color: 'var(--ink)',
-          fontFamily: 'inherit', fontWeight: 800, fontSize: 14,
+          fontFamily: 'inherit', fontWeight: 800, fontSize: 14, flexShrink: 0,
         }}>+ מנוי</button>
-      </div>
-      <SpaceSwitcher lists={lists} onCreateShared={onCreateShared} />
+      </SpaceTabs>
 
       {!loading && payments.length === 0 ? (
         <Card style={{ marginTop: 16 }}>

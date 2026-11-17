@@ -141,7 +141,9 @@ exports.onSpaceItemCreated = onDocumentCreated(
   { document: 'lists/{listId}/items/{itemId}', region: TRIGGER_REGION, memory: '256MiB' },
   async (event) => {
     const item = event.data?.data();
-    if (!item) return;
+    // movedFrom: an old expense moved over from another space (the app's
+    // "move everything" merge), not something new to tell anyone about.
+    if (!item || item.movedFrom) return;
     const listRef = db.collection('lists').doc(event.params.listId);
     const list = (await listRef.get()).data();
     if (!list) return;

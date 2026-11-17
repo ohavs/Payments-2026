@@ -7,7 +7,8 @@
 //   lists/{id}            → { name, kind('personal'|'shared'), ownerUid, members[],
 //                             memberInfo{uid: {name, email, photo}}, groups[](=categories),
 //                             invitedEmails[], budget{monthlyCap, monthlyIncome,
-//                             includeSubsInBudget, categoryCaps} (shared only), createdAt }
+//                             includeSubsInBudget, categoryCaps} (shared only),
+//                             hidden (a personal space emptied into another one), createdAt }
 //   lists/{id}/items/{id} → { title, group(=category), amount, note, date(YYYY-MM-DD),
 //                             source, paidBy(uid|'joint'), addedBy, createdAt }
 //   lists/{id}/subs/{id}  → a subscription, same shape as users/{uid}/payments,
@@ -176,6 +177,8 @@ function useLists(uid, user) {
   // A space just created or joined is selected before the snapshot that brings
   // it in arrives; hold that choice instead of falling back to another space.
   const pendingRef = React.useRef(null);
+  const listsRef = React.useRef(lists);
+  listsRef.current = lists;
   const selectSpace = React.useCallback((id) => { pendingRef.current = id; setActiveListId(id); }, []);
 
   // Reopen the space used last; otherwise the personal one.
@@ -188,9 +191,10 @@ function useLists(uid, user) {
     if (!lists.length) { if (activeListId) setActiveListId(null); return; }
     let saved = null;
     try { saved = localStorage.getItem(ACTIVE_KEY); } catch {}
-    const pick = lists.find(l => l.id === saved)
-      || lists.find(l => !isSharedList(l) && l.ownerUid === uid)
-      || lists[0];
+    const visible = lists.filter(l => !l.hidden);
+    const pick = visible.find(l => l.id === saved)
+      || visible.find(l => !isSharedList(l) && l.ownerUid === uid)
+      || visible[0] || lists[0];
     setActiveListId(pick.id);
   }, [lists, activeListId]);
 
@@ -212,11 +216,12 @@ function useLists(uid, user) {
     () => lists.find(l => l.id === activeListId) || null,
     [lists, activeListId]
   );
-  // Personal spaces first (oldest first), then shared ones.
-  const spaces = React.useMemo(
-    () => [...lists.filter(l => !isSharedList(l)), ...lists.filter(isSharedList)],
-    [lists]
-  );
+  // The tabs: personal spaces first (oldest first), then shared ones. A
+  // personal space emptied into another one stays hidden.
+  const spaces = React.useMemo(() => {
+    const visible = lists.filter(l => !l.hidden);
+    return [...visible.filter(l => !isSharedList(l)), ...visible.filter(isSharedList)];
+  }, [lists]);
 
   const ops = React.useMemo(() => {
     const col = () => fbDb.collection('lists');
@@ -321,10 +326,66 @@ function useLists(uid, user) {
           [`memberInfo.${uid}`]: firebase.firestore.FieldValue.delete(),
         });
       },
+      // Move everything in a space only I am in to another space, so there is
+      // one tab less. Expenses keep their ids; into a shared space they are
+      // marked as paid by me. Personal subscriptions (users/{uid}/payments)
+      // go along when a personal space moves into a shared one. The space is
+      // then deleted, except my last personal space: every user keeps one, so
+      // it is hidden instead. movedFrom tells the server these are not new
+      // expenses to notify the partner about.
+      mergeInto: async (fromId, toId) => {
+        const from = listsRef.current.find(l => l.id === fromId);
+        const to = listsRef.current.find(l => l.id === toId);
+        if (!from || !to || fromId === toId) throw new Error('merge: unknown space');
+        if (!canMergeFrom(from, uid)) throw new Error('merge: not only mine');
+        const toShared = isSharedList(to);
+        const moves = [];
+        for (const sub of ['items', 'subs']) {
+          const snap = await col().doc(fromId).collection(sub).get();
+          snap.docs.forEach(d => moves.push({ sub, src: d.ref, id: d.id, data: d.data() }));
+        }
+        if (toShared && !isSharedList(from)) {
+          const snap = await fbDb.collection('users').doc(uid).collection('payments').get();
+          snap.docs.forEach(d => moves.push({ sub: 'subs', src: d.ref, id: d.id, data: d.data() }));
+        }
+        // A batch holds up to 500 writes: copy + delete per document.
+        for (let i = 0; i < moves.length; i += 200) {
+          const batch = fbDb.batch();
+          moves.slice(i, i + 200).forEach(({ sub, src, id, data }) => {
+            const out = { ...data, movedFrom: fromId };
+            if (toShared) {
+              out.paidBy = data.paidBy || uid;
+              if (sub === 'items') out.addedBy = data.addedBy || uid;
+            }
+            batch.set(col().doc(toId).collection(sub).doc(id), out);
+            batch.delete(src);
+          });
+          await batch.commit();
+        }
+        const groups = [...new Set([...(to.groups || DEFAULT_CATEGORIES), ...(from.groups || [])])];
+        await col().doc(toId).set({ groups }, { merge: true });
+        const lastPersonal = !isSharedList(from)
+          && listsRef.current.filter(l => !isSharedList(l) && l.ownerUid === uid).length <= 1;
+        selectSpace(toId);
+        if (lastPersonal) await col().doc(fromId).set({ hidden: true }, { merge: true });
+        else await col().doc(fromId).delete();
+        return {
+          items: moves.filter(m => m.sub === 'items').length,
+          subs: moves.filter(m => m.sub === 'subs').length,
+          hidden: lastPersonal,
+        };
+      },
+      unhideList: (id) => col().doc(id).set({ hidden: false }, { merge: true }),
     };
   }, [uid, user]);
 
   return { loading, lists, spaces, activeList, activeListId, setActiveListId, items, invites, ops };
+}
+
+// Only a space I own and nobody else is in can be emptied into another one.
+function canMergeFrom(list, uid) {
+  const members = list?.members || [];
+  return !!list && list.ownerUid === uid && members.length === 1 && members[0] === uid;
 }
 
 // A space created or joined a moment ago can still be in flight to the server,
@@ -689,6 +750,42 @@ function ManageExpensesSheet({ open, onClose, lists }) {
   const members = activeList?.members || [];
   const memberInfo = activeList?.memberInfo || {};
 
+  // Move this space into another one (only when nobody else is in it).
+  const [merging, setMerging] = React.useState(false);
+  const mergeTargets = activeList && user && canMergeFrom(activeList, user.uid)
+    ? allLists.filter(l => l.id !== activeListId && !l.hidden) : [];
+  const mergeInto = async (to) => {
+    if (merging) return;
+    const from = activeList;
+    const toShared = isSharedList(to);
+    let subsCount = 0;
+    if (toShared && !isSharedList(from)) {
+      try { subsCount = (await fbDb.collection('users').doc(user.uid).collection('payments').get()).size; } catch {}
+    }
+    const n = lists.items.length;
+    const lastPersonal = !isSharedList(from) && allLists.filter(l => !isSharedList(l) && l.ownerUid === user.uid).length <= 1;
+    const what = [
+      n === 1 ? 'הוצאה אחת' : `${n} הוצאות`,
+      subsCount ? (subsCount === 1 ? 'מנוי אחד' : `${subsCount} מנויים`) : null,
+    ].filter(Boolean).join(' ו־');
+    const ok = await confirm({
+      title: `להעביר הכל ל"${to.name}"?`,
+      message: `יעבור ל"${to.name}": ${what}.${toShared ? ' כל מי שבמרחב יראה את זה.' : ''} `
+        + (lastPersonal ? `"${from.name}" יוסתר מהטאבים (אפשר להחזיר אותו כאן).` : `"${from.name}" יימחק.`),
+      confirmLabel: 'העבר',
+    });
+    if (!ok) return;
+    setMerging(true);
+    try {
+      await ops.mergeInto(from.id, to.id);
+      onClose();
+      toast(`הכל הועבר ל"${to.name}"`, { type: 'success' });
+    } catch (e) {
+      console.error('merge spaces', e);
+      toast('ההעברה נכשלה, נסה שוב', { type: 'error' });
+    } finally { setMerging(false); }
+  };
+
   return (
     <Sheet open={open} onClose={onClose} title="ניהול מרחבים" height="90%">
       <div style={{ padding: '18px 22px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -697,10 +794,19 @@ function ManageExpensesSheet({ open, onClose, lists }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {allLists.map(l => (
                 <Chip key={l.id} active={l.id === activeListId} onClick={() => setActiveListId(l.id)}>
-                  {l.name}
+                  {l.name}{l.hidden ? ' (מוסתר)' : ''}
                 </Chip>
               ))}
             </div>
+          </Section>
+        )}
+
+        {activeList?.hidden && (
+          <Section title="מוסתר">
+            <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+              המרחב הזה הועבר למרחב אחר ולא מופיע בטאבים.
+            </div>
+            <button onClick={() => ops.unhideList(activeListId)} style={ghostBtn}>להחזיר לטאבים</button>
           </Section>
         )}
 
@@ -821,6 +927,22 @@ function ManageExpensesSheet({ open, onClose, lists }) {
                   </div>
                 );
               })}
+            </div>
+          </Section>
+        )}
+
+        {mergeTargets.length > 0 && (
+          <Section title="איחוד מרחבים">
+            <div style={{ fontSize: 12.5, color: 'var(--ink-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+              להעביר את כל ההוצאות{!isSharedList(activeList) ? ' (ולמשותף גם את המנויים)' : ''} של "{activeList.name}"
+              למרחב אחר, ולהישאר עם טאב אחד פחות.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {mergeTargets.map(l => (
+                <button key={l.id} onClick={() => mergeInto(l)} disabled={merging} style={{ ...ghostBtn, opacity: merging ? .5 : 1 }}>
+                  {merging ? <Spinner size={16} /> : null} העבר הכל ל"{l.name}"
+                </button>
+              ))}
             </div>
           </Section>
         )}

@@ -1,7 +1,7 @@
 // Summary tab: where the month's money went. Kept out of the expenses tab so
 // adding and tracking stay front and centre there.
 import React from 'react';
-import { BudgetSettingsSheet, DailyBars, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
+import { BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
 import { activeInMonth, fmtMoney } from '../data.jsx';
 import { MONTH_NAMES_HE, isSharedList } from '../lists.jsx';
 import { PayerTotals } from '../spaces.jsx';
@@ -149,15 +149,6 @@ function SummaryScreen({ lists, categories, payments, settings, setSettings, onO
                     </div>
                   );
                 })}
-              </Card>
-            </>
-          )}
-
-          {stats.count > 0 && (
-            <>
-              <SectionLabel>הוצאה יומית</SectionLabel>
-              <Card className="rise" style={{ padding: '16px 16px 12px' }}>
-                <DailyBars stats={stats} />
               </Card>
             </>
           )}

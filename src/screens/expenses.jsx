@@ -1,5 +1,5 @@
 // Expenses tab: how much went out this month, then every expense by day.
-// Details (pace, categories, daily chart) live one tap away in the summary.
+// Details (pace, categories) live one tap away in the summary.
 import React from 'react';
 import { BudgetSettingsSheet, computeBudgetStats, useSubsMonthly } from '../budget.jsx';
 import { fmtMoney } from '../data.jsx';
@@ -8,7 +8,7 @@ import {
   DAY_NAMES_HE, EditExpenseSheet, MONTH_NAMES_HE, ManageExpensesSheet, PendingInvitesCard,
   expenseDate, fmtDateHe, localISO, todayISO,
 } from '../lists.jsx';
-import { PayerDot, PayerPicker, PayerTotals, SpaceSwitcher } from '../spaces.jsx';
+import { PayerDot, PayerPicker, PayerTotals, SpaceTabs } from '../spaces.jsx';
 import { isSharedList } from '../lists.jsx';
 import { CategoryBadge, CoinLogo } from '../ui/icons.jsx';
 import { Card, EmptyState, Money, MonthSwitcher, Pill, ProgressBar } from '../ui/kit.jsx';
@@ -85,10 +85,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
   return (
     <div style={{ padding: '18px 18px 120px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1 }}>הוצאות</h1>
-        </div>
+      <SpaceTabs lists={lists} title="הוצאות" onCreateShared={onCreateShared}>
         <button onClick={() => setManageOpen(true)} aria-label="מרחבים ושיתוף" className="press" style={{
           width: 42, height: 42, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: 'var(--surface-1)', boxShadow: 'var(--shadow-card)', color: 'var(--ink)',
@@ -101,9 +98,7 @@ function ExpensesScreen({ lists, categories, payments, settings, setSettings, on
             <path d="M14.3 26.5a7.2 7.2 0 0 1 14.4 0Z" fill="#4F46E5" stroke="#141414" strokeWidth="2" strokeLinejoin="round" />
           </svg>
         </button>
-      </div>
-
-      <SpaceSwitcher lists={lists} onCreateShared={onCreateShared} />
+      </SpaceTabs>
       <PendingInvitesCard lists={lists} />
       {suggestionsCard}
 

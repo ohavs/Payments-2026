@@ -1,5 +1,5 @@
-// Shared spaces UI: the space switcher at the top of the expenses and
-// subscriptions tabs, who-paid attribution, per-person totals, and the sheet
+// Shared spaces UI: the space tabs at the top of the expenses and
+// subscriptions screens, who-paid attribution, per-person totals, and the sheet
 // that opens a shared household space and invites a partner.
 import React from 'react';
 import { Sheet } from './components.jsx';
@@ -80,42 +80,51 @@ function PeopleIcon({ size = 18 }) {
 }
 
 // "אישי | הבית שלנו | + משותף": one tap moves the whole app to another space.
-function SpaceSwitcher({ lists, onCreateShared, style }) {
+// The page heading of the expenses and subscriptions screens: one tab per
+// space (personal, shared). With a single space it is just the screen's title;
+// with no shared space yet, a "+ משותף" tab opens one.
+function SpaceTabs({ lists, title, onCreateShared, children }) {
   const { spaces, activeListId, setActiveListId } = lists;
   const hasShared = spaces.some(isSharedList);
-  if (!spaces.length) return null;
   const personalCount = spaces.filter((l) => !isSharedList(l)).length;
+  const tabs = spaces.length > 1 || (spaces.length === 1 && !hasShared);
+  const heading = { margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1 };
   return (
-    <div className="hide-scroll" role="tablist" aria-label="מרחב" style={{
-      display: 'flex', gap: 8, overflowX: 'auto', margin: '12px -18px 0', padding: '2px 18px', ...style,
-    }}>
-      {spaces.map((l) => {
-        const on = l.id === activeListId;
-        const shared = isSharedList(l);
-        const label = shared ? (l.name || 'משותף') : (personalCount > 1 ? (l.name || 'אישי') : 'אישי');
-        return (
-          <button key={l.id} role="tab" aria-selected={on} onClick={() => { if (!on) { haptic('select'); setActiveListId(l.id); } }}
-            className="press" style={{
-              display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, height: 40, padding: shared ? '0 14px 0 8px' : '0 16px',
-              borderRadius: 999, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 800,
-              background: on ? 'var(--ink)' : 'var(--surface-1)', color: on ? 'var(--bg)' : 'var(--ink)',
-              boxShadow: on ? 'none' : 'var(--shadow-card)', whiteSpace: 'nowrap',
-              transition: 'background-color .2s ease, color .2s ease',
-            }}>
-            {shared && <PeopleIcon size={24} />}
-            {label}
-          </button>
-        );
-      })}
-      {!hasShared && (
-        <button onClick={() => { haptic('tap'); onCreateShared(); }} className="press" style={{
-          display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, height: 40, padding: '0 14px',
-          borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 800,
-          background: 'transparent', color: 'var(--ink)', border: '2px dashed var(--surface-3)', whiteSpace: 'nowrap',
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      {!tabs ? <h1 style={heading}>{title}</h1> : (
+        <div className="hide-scroll" role="tablist" aria-label={title} style={{
+          display: 'flex', alignItems: 'flex-end', gap: 22, overflowX: 'auto', minWidth: 0, flex: 1,
+          margin: '-4px -18px', padding: '4px 18px',
         }}>
-          + משותף
-        </button>
+          {spaces.map((l) => {
+            const on = l.id === activeListId;
+            const shared = isSharedList(l);
+            const label = shared ? (l.name || 'משותף') : (personalCount > 1 ? (l.name || 'אישי') : 'אישי');
+            return (
+              <button key={l.id} role="tab" aria-selected={on} onClick={() => { if (!on) { haptic('select'); setActiveListId(l.id); } }}
+                className="press" style={{
+                  position: 'relative', flexShrink: 0, maxWidth: '62vw', padding: '2px 0 10px', border: 'none', background: 'transparent',
+                  cursor: 'pointer', fontFamily: 'inherit', fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.15,
+                  color: on ? 'var(--ink)' : 'var(--ink-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  transition: 'color .2s ease',
+                }}>
+                {label}
+                <span aria-hidden="true" style={{
+                  position: 'absolute', insetInline: 0, bottom: 0, height: 4, borderRadius: 4,
+                  background: 'var(--accent)', transform: on ? 'scaleX(1)' : 'scaleX(0)', transition: 'transform .22s ease',
+                }} />
+              </button>
+            );
+          })}
+          {!hasShared && (
+            <button onClick={() => { haptic('tap'); onCreateShared(); }} className="press" style={{
+              flexShrink: 0, padding: '2px 0 10px', border: 'none', background: 'transparent', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 20, fontWeight: 800, color: 'var(--ink-dim)', whiteSpace: 'nowrap',
+            }}>+ משותף</button>
+          )}
+        </div>
       )}
+      {children}
     </div>
   );
 }
@@ -290,4 +299,4 @@ function SharedSpaceSheet({ open, onClose, lists }) {
   );
 }
 
-export { Avatar, JOINT, PayerDot, PayerPicker, PayerTotals, PeopleIcon, SharedSpaceSheet, SpaceSwitcher, firstName, payerLabel, payers };
+export { Avatar, JOINT, PayerDot, PayerPicker, PayerTotals, PeopleIcon, SharedSpaceSheet, SpaceTabs, firstName, payerLabel, payers };
